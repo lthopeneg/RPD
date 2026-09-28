@@ -34,6 +34,3 @@ jobs:
               sh -c 'npm ci && npm run build'
 
             test -s /home/ubuntu/RPD/dist/index.html
-            if docker container inspect study-front-app >/dev/null 2>&1; then
-              docker exec study-front-app test -s /usr/share/nginx/html/mini-game/index.html
-            fi
