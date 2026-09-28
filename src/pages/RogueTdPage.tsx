@@ -82,6 +82,8 @@ import type {
   UnitTypeId,
 } from "../games/rogueTd/types";
 
+const SCS_LOGO = new URL("../images/scs-logo.png", import.meta.url).href;
+
 const ALL_UNIT_TYPES: UnitTypeId[] = [
   "swordsman",
   "dual_swordsman",
@@ -1596,6 +1598,17 @@ export default function RogueTdPage() {
             <div className="brandLogo" role="img" aria-label="Rogue Path Defense" />
           </section>
           <SynergyHud synergy={synergy} />
+          <a
+            className="scsReturnButton"
+            href="https://scspace.duckdns.org/"
+            aria-label="SCS로 돌아가기"
+            title="SCS로 돌아가기"
+          >
+            <span className="scsReturnMark" aria-hidden="true">
+              <img src={SCS_LOGO} alt="" />
+            </span>
+            <span className="scsReturnText">SCS로 돌아가기</span>
+          </a>
           <GameLog entries={gameLogs} />
         </aside>
 

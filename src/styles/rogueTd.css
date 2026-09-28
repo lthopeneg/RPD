@@ -1073,7 +1073,7 @@ body {
 .damageReport {
   margin-top: 14px;
   padding: 12px;
-  background: #171a21;
+  background: #f4f7fb;
   border: 1px solid #363c48;
   border-radius: 12px;
 }
@@ -1177,6 +1177,64 @@ body {
   width: 100%;
   height: 96px;
   background: url("../images/logo-display.png") center / contain no-repeat;
+}
+
+.scsReturnButton {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: stretch;
+  border: 1px solid #465164;
+  border-radius: 8px;
+  background: #171a21;
+  overflow: hidden;
+  text-decoration: none;
+  transition: border-color 140ms ease, filter 140ms ease;
+}
+
+.scsReturnMark {
+  width: 44%;
+  height: 100%;
+  padding: 5px 0 5px 8px;
+  flex: 0 0 44%;
+  display: block;
+}
+
+.scsReturnMark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.scsReturnText {
+  min-width: 0;
+  height: 100%;
+  padding: 8px 12px 8px 4px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #f3f4f6;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+}
+
+.scsReturnButton:hover,
+.scsReturnButton:focus-visible {
+  border-color: #60a5fa;
+  filter: brightness(1.12);
+  outline: none;
+}
+
+.scsReturnButton:active {
+  filter: brightness(0.92);
 }
 
 .synergyShell {
@@ -1655,9 +1713,14 @@ body {
 
 @media (min-width: 1251px) {
   .leftRail, .centerStage, .rightRail { height: 100%; }
+  .leftRail > .scsReturnButton {
+    margin-top: 0;
+    flex: 1 1 0;
+    min-height: 0;
+  }
   .leftRail > .gameLog {
     height: var(--lower-workspace-height);
-    margin-top: auto;
+    margin-top: 0;
     flex: 0 0 auto;
   }
   .topHud { position: relative; display: block; }

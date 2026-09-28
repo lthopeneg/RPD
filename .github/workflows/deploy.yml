@@ -1,0 +1,39 @@
+name: Deploy RPD to Study Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-rpd-study-server
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build RPD on Oracle Cloud
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
+        with:
+          host: ${{ secrets.SS_HOST }}
+          username: ${{ secrets.SS_USERNAME }}
+          key: ${{ secrets.SS_KEY }}
+          script_stop: true
+          script: |
+            set -eu
+            cd /home/ubuntu/RPD
+            git pull --ff-only origin main
+
+            docker run --rm \
+              --user "$(id -u):$(id -g)" \
+              -e HOME=/tmp \
+              -v /home/ubuntu/RPD:/app \
+              -w /app \
+              node:22-alpine \
+              sh -c 'npm ci && npm run build'
+
+            test -s /home/ubuntu/RPD/dist/index.html
+            if docker container inspect study-front-app >/dev/null 2>&1; then
+              docker exec study-front-app test -s /usr/share/nginx/html/mini-game/index.html
+            fi
