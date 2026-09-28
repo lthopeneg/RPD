@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Production output and TypeScript caches
+dist/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Python caches used by asset build scripts
+__pycache__/
+*.py[cod]
+
+# Large working art sources. Optimized runtime assets are tracked in src/images/.
+art_sources/images/
+
+# Logs and operating system files
+*.log
+.DS_Store
+Thumbs.db
+
