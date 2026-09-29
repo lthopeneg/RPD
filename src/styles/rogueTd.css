@@ -352,8 +352,7 @@ body {
   transform: translateY(-40%);
 }
 
-/* Stage 5 uses a purpose-built directional sheet. The generated poses do not
-   form a continuous gait, so each direction keeps its stable first pose. */
+/* Stage 5 keeps one stable pose per direction until its walk art is finalized. */
 .monsterSprite.bossStage05Sprite {
   background-size: 600% 300%;
   animation: none;
@@ -364,19 +363,19 @@ body {
 .monsterSprite.bossStage05Sprite.move-left,
 .monsterSprite.bossStage05Sprite.move-right { --boss-stage05-row: 100%; }
 .monsterSprite.bossStage05Sprite.move-down {
-  transform: translateY(-40%) scale(1.04);
+  transform: translateY(-40%) scale(1.08);
   transform-origin: center bottom;
 }
 .monsterSprite.bossStage05Sprite.move-up {
-  transform: translateY(-40%) scale(0.97);
+  transform: translateY(-40%) scale(1.08);
   transform-origin: center bottom;
 }
 .monsterSprite.bossStage05Sprite.move-left {
-  transform: translateY(-40%) scale(1.14);
+  transform: translateY(-40%) scale(1.08);
   transform-origin: center bottom;
 }
 .monsterSprite.bossStage05Sprite.move-right {
-  transform: translateY(-40%) scale(-1.14, 1.14);
+  transform: translateY(-40%) scale(-1.08, 1.08);
   transform-origin: center bottom;
 }
 
