@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from build_stage05_walk_sprite import alpha_bbox, keep_largest_alpha_component
+from sprite_utils import alpha_bbox, keep_largest_alpha_component
 
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -7,6 +7,7 @@ import UpgradeStrip from "../components/rogueTd/UpgradeStrip";
 import GameLog from "../components/rogueTd/GameLog";
 import type { GameLogEntry } from "../components/rogueTd/GameLog";
 import UnitDetailPanel from "../components/rogueTd/UnitDetailPanel";
+import BossDetailPanel from "../components/rogueTd/BossDetailPanel";
 import DamageReport from "../components/rogueTd/DamageReport";
 import type { WaveDamageEntry } from "../components/rogueTd/DamageReport";
 import ContextActionMenu from "../components/rogueTd/ContextActionMenu";
@@ -56,6 +57,13 @@ import {
   START_GOLD,
   START_LIFE,
   START_PLAYER_LEVEL,
+  STAGE05_ABSORB_CAST_MS,
+  STAGE05_FIRST_SUMMON_DELAY_MS,
+  STAGE05_SKELETON_HP_RATIO,
+  STAGE05_SKELETON_SPEED_RATIO,
+  STAGE05_SUMMON_CAST_MS,
+  STAGE05_SUMMON_COUNT,
+  STAGE05_SUMMON_CYCLE_MS,
   UNIT_SELL_PRICES,
   UNIT_TYPES,
   UPGRADE_DAMAGE_PER_LEVEL,
@@ -129,6 +137,7 @@ export default function RogueTdPage() {
   const [units, setUnits] = useState<Unit[]>([]),
     [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const [monsters, setMonsters] = useState<Monster[]>([]);
+  const [selectedBossId, setSelectedBossId] = useState<number | null>(null);
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const nextProjectile = useRef(1);
   const [toSpawn, setToSpawn] = useState(0),
@@ -209,6 +218,9 @@ export default function RogueTdPage() {
     : selectedStorageIndex !== null
       ? storageSlots[selectedStorageIndex]
       : null;
+  const selectedBoss = selectedBossId !== null
+    ? monsters.find((monster) => monster.id === selectedBossId && monster.isBoss) ?? null
+    : null;
   const addLog = useCallback((message: string) => {
     setGameLogs((current) => [...current.slice(-99), { id: nextLog.current++, message }]);
   }, []);
@@ -276,6 +288,7 @@ export default function RogueTdPage() {
     lastSpawnGameMs.current = 0;
     setGameResult("playing");
     setSelectedUnitId(null);
+    setSelectedBossId(null);
     setWaveTimeRemainingSec(WAVE_TIME_LIMIT_SEC);
     setStatus("새 맵 생성 완료. 유닛을 구매한 뒤 자연벽에 배치해봐.");
   }, []);
@@ -455,6 +468,17 @@ export default function RogueTdPage() {
 
   const clearInteraction = () => {
     setSelectedUnitId(null);
+    setSelectedBossId(null);
+    setSelectedStorageIndex(null);
+    setActiveCellIndex(null);
+    setActiveStorageIndex(null);
+    setMapPlacementTarget(null);
+    setHighlightMapPlacement(false);
+  };
+
+  const handleBossClick = (monsterId: number) => {
+    setSelectedBossId((current) => current === monsterId ? null : monsterId);
+    setSelectedUnitId(null);
     setSelectedStorageIndex(null);
     setActiveCellIndex(null);
     setActiveStorageIndex(null);
@@ -578,6 +602,9 @@ export default function RogueTdPage() {
       progress: -index * 0.35,
       speedTilesPerSecond: MONSTER_STATS[spawnCategory].speed,
       laps: 0,
+      stage05NextSummonAtMs: bossStage === 5
+        ? gameTimeMs.current + STAGE05_FIRST_SUMMON_DELAY_MS
+        : undefined,
     }));
     const nextMonsters = running ? [...monstersRef.current, ...created] : created;
     monstersRef.current = nextMonsters;
@@ -982,7 +1009,115 @@ export default function RogueTdPage() {
           progress: 0,
           speedTilesPerSecond: MONSTER_STATS[category].speed * lateWaveSpeedMultiplier,
           laps: 0,
+          stage05NextSummonAtMs: wave === 5
+            ? gameNow + STAGE05_FIRST_SUMMON_DELAY_MS
+            : undefined,
         });
+      }
+
+      // 5스테이지 보스: 주기적으로 스켈레톤을 소환하고 전멸 전까지 무적.
+      // 제한시간 안에 남은 소환수는 보스가 HP를 흡수한 뒤 제거한다.
+      const stage05Bosses = monstersRef.current.filter(
+        (monster) => monster.hp > 0 && monster.isBoss && monster.bossStage === 5,
+      );
+      for (const boss of stage05Bosses) {
+        const summons = monstersRef.current.filter(
+          (monster) => monster.hp > 0 && monster.summonedByBossId === boss.id,
+        );
+
+        if (
+          boss.stage05SummoningUntilMs !== undefined &&
+          gameNow >= boss.stage05SummoningUntilMs
+        ) {
+          const skeletonHp = Math.max(
+            1,
+            Math.round(getMonsterHp("human", 5) * STAGE05_SKELETON_HP_RATIO),
+          );
+          const bossPathDistance = boss.pathStep + boss.progress;
+          const skeletons: Monster[] = Array.from(
+            { length: STAGE05_SUMMON_COUNT },
+            (_, index) => {
+              const spawnDistance = Math.max(0, bossPathDistance - (index + 1) * 0.45);
+              const spawnPathStep = Math.min(
+                path.length - 2,
+                Math.floor(spawnDistance),
+              );
+              return {
+                id: nextMonster.current++,
+                isBoss: false,
+                category: "human",
+                hp: skeletonHp,
+                maxHp: skeletonHp,
+                pathStep: spawnPathStep,
+                progress: spawnDistance - spawnPathStep,
+                speedTilesPerSecond:
+                  MONSTER_STATS.human.speed * STAGE05_SKELETON_SPEED_RATIO,
+                laps: 0,
+                summonedByBossId: boss.id,
+                noKillGold: true,
+              };
+            },
+          );
+          monstersRef.current.push(...skeletons);
+          boss.stage05SummoningUntilMs = undefined;
+          boss.stage05ShieldActive = true;
+          boss.stage05AbsorbAtMs = gameNow + STAGE05_SUMMON_CYCLE_MS;
+          setStatus("☠️ 리치가 스켈레톤 5마리를 소환하고 보호막을 펼쳤습니다!");
+          addLog("리치가 스켈레톤 5마리를 소환했습니다. 15초 안에 처치해야 합니다.");
+        } else if (boss.stage05ShieldActive) {
+          if (
+            boss.stage05AbsorbingUntilMs !== undefined &&
+            gameNow >= boss.stage05AbsorbingUntilMs
+          ) {
+            const healedHp = Math.min(
+              boss.stage05PendingHeal ?? 0,
+              boss.maxHp - boss.hp,
+            );
+            boss.hp += healedHp;
+            const summonIds = new Set(summons.map((skeleton) => skeleton.id));
+            monstersRef.current = monstersRef.current.filter(
+              (monster) => !summonIds.has(monster.id),
+            );
+            projectilesRef.current = projectilesRef.current.filter(
+              (projectile) => !summonIds.has(projectile.targetId),
+            );
+            boss.stage05ShieldActive = false;
+            boss.stage05AbsorbAtMs = undefined;
+            boss.stage05AbsorbingUntilMs = undefined;
+            boss.stage05PendingHeal = undefined;
+            boss.stage05NextSummonAtMs = gameNow + STAGE05_SUMMON_CYCLE_MS;
+            setStatus(`🩸 리치가 스켈레톤의 체력을 흡수해 ${healedHp} HP를 회복했습니다!`);
+            addLog(`리치가 남은 스켈레톤 ${summons.length}마리를 흡수해 ${healedHp} HP를 회복했습니다.`);
+          } else if (boss.stage05AbsorbingUntilMs !== undefined) {
+            // 흡수 연출이 끝날 때까지 보스와 소환수를 유지한다.
+          } else if (summons.length === 0) {
+            boss.stage05ShieldActive = false;
+            boss.stage05AbsorbAtMs = undefined;
+            boss.stage05NextSummonAtMs = gameNow + STAGE05_SUMMON_CYCLE_MS;
+            setStatus("💀 스켈레톤을 모두 처치해 보스의 보호막이 해제되었습니다!");
+            addLog("스켈레톤을 모두 처치해 리치의 보호막이 해제되었습니다.");
+          } else if (
+            boss.stage05AbsorbAtMs !== undefined &&
+            gameNow >= boss.stage05AbsorbAtMs
+          ) {
+            const absorbedHp = summons.reduce((total, skeleton) => total + skeleton.hp, 0);
+            boss.stage05AbsorbingUntilMs = gameNow + STAGE05_ABSORB_CAST_MS;
+            boss.stage05PendingHeal = absorbedHp;
+            summons.forEach((skeleton) => {
+              skeleton.stage05BeingAbsorbed = true;
+            });
+            setStatus("🟣 리치가 남은 스켈레톤의 생명력을 흡수합니다!");
+            addLog("리치가 남은 스켈레톤의 생명력 흡수를 시작했습니다.");
+          }
+        } else if (
+          boss.stage05SummoningUntilMs === undefined &&
+          boss.stage05NextSummonAtMs !== undefined &&
+          gameNow >= boss.stage05NextSummonAtMs
+        ) {
+          boss.stage05NextSummonAtMs = undefined;
+          boss.stage05SummoningUntilMs = gameNow + STAGE05_SUMMON_CAST_MS;
+          setStatus("🔮 리치가 이동을 멈추고 스켈레톤 소환을 시작합니다!");
+        }
       }
 
       // 2. 몬스터 이동 & 완주(laps) 순환 이동 처리
@@ -1006,7 +1141,15 @@ export default function RogueTdPage() {
         }
         // 둔화/마비 속도 적용
         let currentSpeed = m.speedTilesPerSecond;
-        if (m.paralyzeUntilMs && gameNow < m.paralyzeUntilMs) {
+        if (
+          m.stage05BeingAbsorbed ||
+          (m.stage05AbsorbingUntilMs !== undefined &&
+            gameNow < m.stage05AbsorbingUntilMs) ||
+          m.stage05SummoningUntilMs !== undefined &&
+          gameNow < m.stage05SummoningUntilMs
+        ) {
+          currentSpeed = 0;
+        } else if (m.paralyzeUntilMs && gameNow < m.paralyzeUntilMs) {
           currentSpeed = 0; // 마비: 0% 속도
         } else if (m.slowUntilMs && gameNow < m.slowUntilMs) {
           currentSpeed *= 0.5; // 둔화: 50% 속도
@@ -1081,13 +1224,20 @@ export default function RogueTdPage() {
         ));
 
       const dealDamage = (m: Monster, damage: number, sourceUnitId: number) => {
-        if (m.hp <= 0 || damage <= 0) return 0;
+        if (
+          m.hp <= 0 ||
+          damage <= 0 ||
+          m.stage05ShieldActive ||
+          m.stage05BeingAbsorbed
+        ) return 0;
         const actualDamage = Math.min(m.hp, damage);
         m.hp -= actualDamage;
         waveDamageRef.current[sourceUnitId] =
           (waveDamageRef.current[sourceUnitId] ?? 0) + actualDamage;
         m.lastHitTime = gameNow;
-        if (m.hp <= 0) killGold += m.isBoss ? BOSS_KILL_GOLD : MONSTER_KILL_GOLD;
+        if (m.hp <= 0 && !m.noKillGold) {
+          killGold += m.isBoss ? BOSS_KILL_GOLD : MONSTER_KILL_GOLD;
+        }
         return actualDamage;
       };
 
@@ -1225,7 +1375,11 @@ export default function RogueTdPage() {
         };
 
         const inRange = monstersRef.current.filter(
-          (m) => m.hp > 0 && getDistance(m) <= rangeTiles,
+          (m) =>
+            m.hp > 0 &&
+            !m.stage05ShieldActive &&
+            !m.stage05BeingAbsorbed &&
+            getDistance(m) <= rangeTiles,
         );
 
         let target = inRange.find((m) => m.id === unit.targetId);
@@ -1644,10 +1798,12 @@ export default function RogueTdPage() {
             units={units}
             monsters={monsters}
             selectedUnitId={selectedUnitId}
+            selectedBossId={selectedBossId}
             rangerRangeBonusTiles={RANGER_RANGE_BONUS_TILES[synergy.classTiers.ranger]}
             warriorAttackSpeedBonus={WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior]}
             upgrades={upgrades}
             onCellClick={onCellClick}
+            onBossClick={handleBossClick}
             projectiles={projectiles}
             gameNowMs={gameTimeMs.current}
             animationPaused={!running || paused}
@@ -1659,7 +1815,11 @@ export default function RogueTdPage() {
 
           <UpgradeStrip upgrades={upgrades} />
           <div className="centerWorkspace">
-            <UnitDetailPanel unit={selectedDetailUnit} upgrades={upgrades} synergy={synergy} emptyMessage={status} />
+            {selectedBoss ? (
+              <BossDetailPanel boss={selectedBoss} gameNowMs={gameTimeMs.current} />
+            ) : (
+              <UnitDetailPanel unit={selectedDetailUnit} upgrades={upgrades} synergy={synergy} emptyMessage={status} />
+            )}
             <StorageBoard
               slots={storageSlots}
               selectedIndex={selectedStorageIndex}

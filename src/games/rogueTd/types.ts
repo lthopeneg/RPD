@@ -87,6 +87,15 @@ export interface Monster {
   burnHitTriggered?: boolean;
   burnEffectUntilMs?: number;
   sniperImpactUntilMs?: number;
+  summonedByBossId?: number;
+  noKillGold?: boolean;
+  stage05BeingAbsorbed?: boolean;
+  stage05ShieldActive?: boolean;
+  stage05NextSummonAtMs?: number;
+  stage05SummoningUntilMs?: number;
+  stage05AbsorbAtMs?: number;
+  stage05AbsorbingUntilMs?: number;
+  stage05PendingHeal?: number;
 }
 
 export interface Projectile {

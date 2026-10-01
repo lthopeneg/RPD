@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from build_stage05_walk_sprite import keep_largest_alpha_component
+from sprite_utils import keep_largest_alpha_component
 
 
 def main() -> None:

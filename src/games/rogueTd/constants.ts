@@ -102,6 +102,13 @@ export const getMonsterHp = (category: MonsterCategory, wave: number) =>
     (wave === 31 ? 1.35 : wave === 32 ? 1.65 : 1),
   );
 export const BOSS_HP = 300;
+export const STAGE05_SUMMON_COUNT = 5;
+export const STAGE05_FIRST_SUMMON_DELAY_MS = 8000;
+export const STAGE05_SUMMON_CAST_MS = 1000;
+export const STAGE05_ABSORB_CAST_MS = 1200;
+export const STAGE05_SUMMON_CYCLE_MS = 15000;
+export const STAGE05_SKELETON_HP_RATIO = 0.7;
+export const STAGE05_SKELETON_SPEED_RATIO = 0.85;
 export const BOSS_SNIPER_DAMAGE_MULTIPLIER = 3; // 즉사 발동 시 보스 대상 테스트 피해 배율
 export const FIRE_BURN_CHANCE = 0.10;
 export const ICE_SLOW_CHANCE = 0.10;

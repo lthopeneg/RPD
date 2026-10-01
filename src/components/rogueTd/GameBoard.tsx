@@ -5,8 +5,14 @@ import type {
   Projectile,
   Unit,
 } from "../../games/rogueTd/types";
-import { COLS, ROWS, UNIT_TYPES } from "../../games/rogueTd/constants";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  COLS,
+  ROWS,
+  STAGE05_ABSORB_CAST_MS,
+  STAGE05_SUMMON_CAST_MS,
+  UNIT_TYPES,
+} from "../../games/rogueTd/constants";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { DamageUpgrade } from "../../games/rogueTd/upgrades";
 import { getUpgradeLevels } from "../../games/rogueTd/upgrades";
 import { UNIT_EFFECT_CLASSES, UNIT_SPRITE_CLASSES } from "../../games/rogueTd/unitSprites";
@@ -60,10 +66,12 @@ interface Props {
   units: Unit[];
   monsters: Monster[];
   selectedUnitId: number | null;
+  selectedBossId: number | null;
   rangerRangeBonusTiles: number;
   warriorAttackSpeedBonus: number;
   upgrades: DamageUpgrade[];
   onCellClick: (i: number) => void;
+  onBossClick: (monsterId: number) => void;
   projectiles: Projectile[];
   gameNowMs: number;
   animationPaused: boolean;
@@ -113,6 +121,18 @@ export default function GameBoard(p: Props) {
       : 0)
     : 0;
   const now = p.gameNowMs;
+  const getMonsterBoardPosition = (monster: Monster) => {
+    const from = p.path[Math.min(monster.pathStep, p.path.length - 1)] ?? p.start;
+    const to = p.path[Math.min(monster.pathStep + 1, p.path.length - 1)] ?? from;
+    const fromRow = Math.floor(from / COLS);
+    const fromCol = from % COLS;
+    const toRow = Math.floor(to / COLS);
+    const toCol = to % COLS;
+    return {
+      x: ((fromCol + (toCol - fromCol) * monster.progress + 0.5) / COLS) * 100,
+      y: ((fromRow + (toRow - fromRow) * monster.progress + 0.5) / ROWS) * 100,
+    };
+  };
 
   useEffect(() => {
     setPathPulseStart(0);
@@ -347,6 +367,32 @@ export default function GameBoard(p: Props) {
           );
         })}
 
+        {p.monsters
+          .filter((monster) => monster.stage05BeingAbsorbed)
+          .map((skeleton) => {
+            const boss = p.monsters.find(
+              (monster) => monster.id === skeleton.summonedByBossId,
+            );
+            if (!boss) return null;
+            const source = getMonsterBoardPosition(skeleton);
+            const target = getMonsterBoardPosition(boss);
+            return (
+              <span
+                key={`absorb-wisp-${skeleton.id}`}
+                className="stage05AbsorbWisp"
+                style={{
+                  left: `${source.x}%`,
+                  top: `${source.y}%`,
+                  "--stage05-absorb-target-x": `${target.x}%`,
+                  "--stage05-absorb-target-y": `${target.y}%`,
+                  animationDuration: `${STAGE05_ABSORB_CAST_MS / p.animationSpeed}ms`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                } as CSSProperties}
+                aria-hidden="true"
+              />
+            );
+          })}
+
         {p.monsters.map((m) => {
           const a = p.path[Math.min(m.pathStep, p.path.length - 1)] ?? p.start;
           const b = p.path[Math.min(m.pathStep + 1, p.path.length - 1)] ?? a;
@@ -371,6 +417,12 @@ export default function GameBoard(p: Props) {
           const isParalyzed = m.paralyzeUntilMs && now < m.paralyzeUntilMs;
           const isBurning = m.burnEffectUntilMs && now < m.burnEffectUntilMs;
           const isBossSniperHit = m.sniperImpactUntilMs && now < m.sniperImpactUntilMs;
+          const isStage05Summoning =
+            m.stage05SummoningUntilMs !== undefined &&
+            now < m.stage05SummoningUntilMs;
+          const isStage05Absorbing =
+            m.stage05AbsorbingUntilMs !== undefined &&
+            now < m.stage05AbsorbingUntilMs;
           const sniperSpecialTarget = p.projectiles.some((projectile) =>
             projectile.targetId === m.id &&
             projectile.sourceTypeId === "sniper" &&
@@ -390,18 +442,91 @@ export default function GameBoard(p: Props) {
           return (
             <span
               key={m.id}
-              className={`monster ${m.category} ${m.isBoss ? "boss" : ""} ${m.isFinalBoss ? "finalBoss" : ""} ${isHit ? "hitFlash" : ""} ${isBurning ? "burning" : ""} ${isBossSniperHit ? "bossSniperHit" : ""} ${
+              className={`monster ${m.category} ${m.isBoss ? "boss" : ""} ${m.id === p.selectedBossId ? "selectedBoss" : ""} ${m.isFinalBoss ? "finalBoss" : ""} ${m.summonedByBossId !== undefined ? "stage05Skeleton" : ""} ${m.stage05BeingAbsorbed ? "stage05BeingAbsorbed" : ""} ${m.stage05ShieldActive ? "stage05SummonShield" : ""} ${isStage05Summoning ? "stage05Summoning" : ""} ${isStage05Absorbing ? "stage05Absorbing" : ""} ${isHit ? "hitFlash" : ""} ${isBurning ? "burning" : ""} ${isBossSniperHit ? "bossSniperHit" : ""} ${
                 isParalyzed ? "paralyzed" : isSlow ? "slowed" : ""
               }`}
-              style={{ left: `${x}%`, top: `${y}%` }}
+              style={{
+                left: `${x}%`,
+                top: `${y}%`,
+                ...(m.stage05BeingAbsorbed
+                  ? {
+                      animationDuration: `${STAGE05_ABSORB_CAST_MS / p.animationSpeed}ms`,
+                      animationPlayState: p.animationPaused ? "paused" : "running",
+                    }
+                  : {}),
+              }}
+              role={m.isBoss ? "button" : undefined}
+              tabIndex={m.isBoss ? 0 : undefined}
+              onClick={m.isBoss
+                ? (event) => {
+                    event.stopPropagation();
+                    p.onBossClick(m.id);
+                  }
+                : undefined}
+              onKeyDown={m.isBoss
+                ? (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      p.onBossClick(m.id);
+                    }
+                  }
+                : undefined}
               title={m.isBoss
                 ? `${m.isFinalBoss ? `FINAL BOSS ${m.finalBossPhase}단계` : `${BOSS_NAMES[m.category]} 보스`} HP ${m.hp}/${m.maxHp} | 완주 ${m.laps}회 (제한 없음)`
                 : `[${m.category}] HP ${m.hp}/${m.maxHp} | Laps: ${m.laps}/5`}
             >
+              {m.bossStage === 5 && (
+                <span
+                  className="bossStage05Aura"
+                  style={{
+                    animationDuration: `${1600 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              {m.stage05ShieldActive && (
+                <span
+                  className="stage05ShieldEffect"
+                  style={{
+                    animationDuration: `${900 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              {isStage05Summoning && (
+                <span
+                  className="stage05SummonEffect"
+                  style={{
+                    animationDuration: `${STAGE05_SUMMON_CAST_MS / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              {isStage05Absorbing && (
+                <span
+                  className="stage05AbsorbCore"
+                  style={{
+                    animationDuration: `${STAGE05_ABSORB_CAST_MS / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
               <span
                 className={`monsterSprite ${m.isBoss ? "bossSprite" : ""} ${monsterSpriteClass} move-${moveDirection}`}
                 style={{
-                  animationDuration: `${480 / p.animationSpeed}ms`,
+                  animationDuration: `${(
+                    m.bossStage === 5
+                      ? isStage05Summoning
+                        ? STAGE05_SUMMON_CAST_MS
+                        : isStage05Absorbing
+                          ? STAGE05_ABSORB_CAST_MS
+                          : 1500
+                      : 480
+                  ) / p.animationSpeed}ms`,
                   animationPlayState: p.animationPaused ? "paused" : "running",
                 }}
                 aria-hidden="true"

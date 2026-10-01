@@ -8,6 +8,7 @@ Run `scripts/normalize_boss_sprites.py` after replacing one of the boss source s
 
 The other scripts in `scripts/` rebuild the stage 5 boss and regular monster sheets. Keep the source filenames referenced by those scripts when replacing local artwork:
 
-- `build_stage05_walk_sprite.py`: stage 5 boss direction-specific key poses
+- `build_stage05_lich_sprites.py`: stage 5 lich body and mist layers
 - `build_enemy_human_sprite.py`: human monster sheet
 - `build_enemy_land_sprite.py`: land monster directional strips
+- `sprite_utils.py`: shared alpha cleanup helpers used by the sprite builders
