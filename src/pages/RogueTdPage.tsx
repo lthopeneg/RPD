@@ -64,6 +64,11 @@ import {
   STAGE05_SUMMON_CAST_MS,
   STAGE05_SUMMON_COUNT,
   STAGE05_SUMMON_CYCLE_MS,
+  STAGE10_FIRST_STOMP_DELAY_MS,
+  STAGE10_STOMP_COOLDOWN_MS,
+  STAGE10_STOMP_RADIUS_TILES,
+  STAGE10_STOMP_STUN_MS,
+  STAGE10_STOMP_WARNING_MS,
   UNIT_SELL_PRICES,
   UNIT_TYPES,
   UPGRADE_DAMAGE_PER_LEVEL,
@@ -150,6 +155,7 @@ export default function RogueTdPage() {
   // 전투·상태이상·제한시간은 일시정지와 배속을 공유하는 게임 시간을 사용한다.
   const gameTimeMs = useRef(0);
   const waveTimeRemainingMs = useRef(WAVE_TIME_LIMIT_SEC * 1000);
+  const boardShakeUntilMs = useRef(0);
   const [waveTimeRemainingSec, setWaveTimeRemainingSec] = useState(WAVE_TIME_LIMIT_SEC);
 
   // 창고(보관함 4x5 = 20칸) state
@@ -284,6 +290,7 @@ export default function RogueTdPage() {
     pausedRef.current = false;
     setGameSpeed(1);
     gameTimeMs.current = 0;
+    boardShakeUntilMs.current = 0;
     waveTimeRemainingMs.current = WAVE_TIME_LIMIT_SEC * 1000;
     lastSpawnGameMs.current = 0;
     setGameResult("playing");
@@ -605,6 +612,9 @@ export default function RogueTdPage() {
       stage05NextSummonAtMs: bossStage === 5
         ? gameTimeMs.current + STAGE05_FIRST_SUMMON_DELAY_MS
         : undefined,
+      stage10NextStompAtMs: bossStage === 10
+        ? gameTimeMs.current + STAGE10_FIRST_STOMP_DELAY_MS
+        : undefined,
     }));
     const nextMonsters = running ? [...monstersRef.current, ...created] : created;
     monstersRef.current = nextMonsters;
@@ -899,6 +909,7 @@ export default function RogueTdPage() {
     projectilesRef.current = [];
     setToSpawn(isBossWave(wave) ? 1 : getWaveMonsterCount(wave));
     gameTimeMs.current = 0;
+    boardShakeUntilMs.current = 0;
     waveTimeRemainingMs.current = waveTimeLimit * 1000;
     lastSpawnGameMs.current = 0;
     setWaveTimeRemainingSec(waveTimeLimit);
@@ -1012,6 +1023,9 @@ export default function RogueTdPage() {
           stage05NextSummonAtMs: wave === 5
             ? gameNow + STAGE05_FIRST_SUMMON_DELAY_MS
             : undefined,
+          stage10NextStompAtMs: wave === 10
+            ? gameNow + STAGE10_FIRST_STOMP_DELAY_MS
+            : undefined,
         });
       }
 
@@ -1120,6 +1134,53 @@ export default function RogueTdPage() {
         }
       }
 
+      // 10스테이지 보스: 3칸 범위를 예고한 뒤 지면을 강타해 유닛을 기절시킨다.
+      const stage10Bosses = monstersRef.current.filter(
+        (monster) => monster.hp > 0 && monster.isBoss && monster.bossStage === 10,
+      );
+      for (const boss of stage10Bosses) {
+        if (
+          boss.stage10StompImpactAtMs !== undefined &&
+          gameNow >= boss.stage10StompImpactAtMs
+        ) {
+          const bossPathCell =
+            path[Math.min(boss.pathStep, path.length - 1)] ?? start;
+          const nextBossPathCell =
+            path[Math.min(boss.pathStep + 1, path.length - 1)] ?? bossPathCell;
+          const [bossFromRow, bossFromCol] = toRC(bossPathCell);
+          const [bossToRow, bossToCol] = toRC(nextBossPathCell);
+          const bossRow = bossFromRow + (bossToRow - bossFromRow) * boss.progress;
+          const bossCol = bossFromCol + (bossToCol - bossFromCol) * boss.progress;
+          let stunnedCount = 0;
+
+          for (const unit of unitsRef.current) {
+            const [unitRow, unitCol] = toRC(unit.cell);
+            if (
+              Math.hypot(unitRow - bossRow, unitCol - bossCol) <=
+              STAGE10_STOMP_RADIUS_TILES
+            ) {
+              unit.stunnedUntilMs = gameNow + STAGE10_STOMP_STUN_MS;
+              stunnedCount += 1;
+            }
+          }
+
+          boss.stage10StompImpactAtMs = undefined;
+          boss.stage10NextStompAtMs = gameNow + STAGE10_STOMP_COOLDOWN_MS;
+          boardShakeUntilMs.current = gameNow + 450;
+          setUnits([...unitsRef.current]);
+          setStatus(`💥 대지 강타! 범위 안의 유닛 ${stunnedCount}기가 3초간 기절했습니다.`);
+          addLog(`10스테이지 보스가 대지 강타로 유닛 ${stunnedCount}기를 기절시켰습니다.`);
+        } else if (
+          boss.stage10StompImpactAtMs === undefined &&
+          boss.stage10NextStompAtMs !== undefined &&
+          gameNow >= boss.stage10NextStompAtMs
+        ) {
+          boss.stage10NextStompAtMs = undefined;
+          boss.stage10StompImpactAtMs = gameNow + STAGE10_STOMP_WARNING_MS;
+          setStatus("⚠️ 육지형 보스가 대지 강타를 준비합니다!");
+        }
+      }
+
       // 2. 몬스터 이동 & 완주(laps) 순환 이동 처리
       let instantGameOver = false;
 
@@ -1147,6 +1208,10 @@ export default function RogueTdPage() {
             gameNow < m.stage05AbsorbingUntilMs) ||
           m.stage05SummoningUntilMs !== undefined &&
           gameNow < m.stage05SummoningUntilMs
+          || (
+            m.stage10StompImpactAtMs !== undefined &&
+            gameNow < m.stage10StompImpactAtMs
+          )
         ) {
           currentSpeed = 0;
         } else if (m.paralyzeUntilMs && gameNow < m.paralyzeUntilMs) {
@@ -1354,6 +1419,7 @@ export default function RogueTdPage() {
       // 4. 유닛 사격 및 투사체 생성 (9종 유닛 스킬 개별 동작)
       for (const unit of unitsRef.current) {
         unit.cooldownMs = Math.max(0, unit.cooldownMs - dt);
+        if (unit.stunnedUntilMs && gameNow < unit.stunnedUntilMs) continue;
         if (unit.cooldownMs > 0) continue;
 
         const uDef = UNIT_TYPES[unit.typeId];
@@ -1808,6 +1874,7 @@ export default function RogueTdPage() {
             gameNowMs={gameTimeMs.current}
             animationPaused={!running || paused}
             animationSpeed={gameSpeed}
+            boardShaking={gameTimeMs.current < boardShakeUntilMs.current}
             activeCellIndex={activeCellIndex}
             highlightedPlacementCells={highlightMapPlacement}
             renderCellMenu={renderCellMenu}

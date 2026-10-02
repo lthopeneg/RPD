@@ -65,6 +65,7 @@ export interface Unit {
   targetId: number | null;
   lastAttackTimeMs?: number;
   facing?: "left" | "right";
+  stunnedUntilMs?: number;
 }
 
 export interface Monster {
@@ -96,6 +97,8 @@ export interface Monster {
   stage05AbsorbAtMs?: number;
   stage05AbsorbingUntilMs?: number;
   stage05PendingHeal?: number;
+  stage10NextStompAtMs?: number;
+  stage10StompImpactAtMs?: number;
 }
 
 export interface Projectile {

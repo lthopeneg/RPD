@@ -60,6 +60,41 @@ body {
   background: #171a20;
   overflow: hidden;
 }
+.board.stompShaking {
+  animation: stage10BoardShake 450ms linear 1;
+}
+@keyframes stage10BoardShake {
+  0%, 100% { transform: translate(0, 0); }
+  12% { transform: translate(-4px, 2px); }
+  25% { transform: translate(4px, -2px); }
+  38% { transform: translate(-3px, -2px); }
+  52% { transform: translate(3px, 2px); }
+  68% { transform: translate(-2px, 1px); }
+  84% { transform: translate(2px, -1px); }
+}
+
+.stage10StompTelegraph {
+  position: absolute;
+  z-index: 4;
+  border: 2px solid rgba(248, 113, 113, 0.9);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(239, 68, 68, 0.08) 0 52%,
+    rgba(239, 68, 68, 0.24) 72%,
+    rgba(127, 29, 29, 0.38) 100%
+  );
+  box-shadow: inset 0 0 18px rgba(239, 68, 68, 0.36), 0 0 8px rgba(239, 68, 68, 0.65);
+  transform: translate(-50%, -50%);
+  animation: stage10StompWarning 1200ms ease-in-out 1;
+  pointer-events: none;
+}
+@keyframes stage10StompWarning {
+  0% { opacity: 0.25; transform: translate(-50%, -50%) scale(0.86); }
+  55% { opacity: 0.68; }
+  82% { opacity: 0.92; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(0.97); }
+}
 .cell {
   position: relative;
   display: flex;
@@ -349,6 +384,20 @@ body {
   background-position: 0 var(--monster-row);
   animation: none;
   transform: translateY(-40%);
+}
+
+/* Stage 10 keeps front, back, and right-facing rows. Left movement mirrors
+   the remaining side row so both directions use one consistent silhouette. */
+.monsterSprite.bossStage10Sprite {
+  background-size: 400% 300%;
+  animation: monsterWalk 720ms linear infinite;
+}
+.monsterSprite.bossStage10Sprite.move-down { --monster-row: 0%; }
+.monsterSprite.bossStage10Sprite.move-up { --monster-row: 50%; }
+.monsterSprite.bossStage10Sprite.move-left,
+.monsterSprite.bossStage10Sprite.move-right { --monster-row: 100%; }
+.monsterSprite.bossStage10Sprite.move-left {
+  transform: translateY(-40%) scaleX(-1);
 }
 
 /* Keep the generated body rigid and animate the separately generated
@@ -1275,6 +1324,35 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.unitWrapper.stunned .unit {
+  opacity: 0.72;
+  filter: grayscale(0.35) brightness(0.78) drop-shadow(0 3px 2px rgba(0, 0, 0, 0.72));
+}
+.unitStunStars {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  top: -7px;
+  width: 38px;
+  height: 18px;
+  transform: translateX(-50%);
+  animation: unitStunOrbit 850ms linear infinite;
+  pointer-events: none;
+}
+.unitStunStars i {
+  position: absolute;
+  color: #fde047;
+  font-size: 11px;
+  font-style: normal;
+  text-shadow: 0 0 3px #f59e0b, 0 1px 2px #000;
+}
+.unitStunStars i:nth-child(1) { left: 1px; top: 7px; }
+.unitStunStars i:nth-child(2) { left: 15px; top: 0; }
+.unitStunStars i:nth-child(3) { right: 1px; top: 7px; }
+@keyframes unitStunOrbit {
+  from { transform: translateX(-50%) rotate(0deg); }
+  to { transform: translateX(-50%) rotate(360deg); }
 }
 
 .unitTierBadge {

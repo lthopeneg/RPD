@@ -10,6 +10,8 @@ import {
   ROWS,
   STAGE05_ABSORB_CAST_MS,
   STAGE05_SUMMON_CAST_MS,
+  STAGE10_STOMP_RADIUS_TILES,
+  STAGE10_STOMP_WARNING_MS,
   UNIT_TYPES,
 } from "../../games/rogueTd/constants";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
@@ -76,6 +78,7 @@ interface Props {
   gameNowMs: number;
   animationPaused: boolean;
   animationSpeed: 1 | 2;
+  boardShaking: boolean;
   activeCellIndex: number | null;
   highlightedPlacementCells: boolean;
   renderCellMenu: (cellIndex: number) => ReactNode;
@@ -146,11 +149,13 @@ export default function GameBoard(p: Props) {
   return (
     <div className="boardShell">
       <div
-        className="board"
+        className={`board ${p.boardShaking ? "stompShaking" : ""}`}
         style={{
           gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
           gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))`,
           aspectRatio: `${COLS} / ${ROWS}`,
+          animationDuration: `${450 / p.animationSpeed}ms`,
+          animationPlayState: p.animationPaused ? "paused" : "running",
         }}
       >
         {p.grid.map((cell, i) => {
@@ -163,6 +168,9 @@ export default function GameBoard(p: Props) {
           const attackAge = u?.lastAttackTimeMs === undefined
             ? Number.POSITIVE_INFINITY
             : now - u.lastAttackTimeMs;
+          const isStunned = Boolean(
+            u?.stunnedUntilMs && now < u.stunnedUntilMs,
+          );
           const classes = ["cell", cell.type];
           if (i === p.start) classes.push("start");
           if (i === p.goal) classes.push("goal");
@@ -221,10 +229,10 @@ export default function GameBoard(p: Props) {
               )}
 
               {u && (
-                <div className="unitWrapper" key={u.id}>
+                <div className={`unitWrapper ${isStunned ? "stunned" : ""}`} key={u.id}>
                   {spriteClass ? (
                     <span
-                      className={`unit ${spriteClass} ${u.facing === "left" ? "facingLeft" : ""} ${attackAge >= 0 && attackAge < 360 ? "attacking" : ""}`}
+                      className={`unit ${spriteClass} ${u.facing === "left" ? "facingLeft" : ""} ${!isStunned && attackAge >= 0 && attackAge < 360 ? "attacking" : ""}`}
                       role="img"
                       aria-label={UNIT_TYPES[u.typeId].name}
                     />
@@ -239,6 +247,18 @@ export default function GameBoard(p: Props) {
                   {u.tier > 1 && (
                     <span className="unitTierBadge">
                       {"★".repeat(u.tier)}
+                    </span>
+                  )}
+                  {isStunned && (
+                    <span
+                      className="unitStunStars"
+                      style={{
+                        animationDuration: `${850 / p.animationSpeed}ms`,
+                        animationPlayState: p.animationPaused ? "paused" : "running",
+                      }}
+                      aria-label="기절"
+                    >
+                      <i>★</i><i>★</i><i>★</i>
                     </span>
                   )}
                   <UnitTooltip
@@ -265,6 +285,32 @@ export default function GameBoard(p: Props) {
             }}
           />
         )}
+
+        {p.monsters
+          .filter(
+            (monster) =>
+              monster.bossStage === 10 &&
+              monster.stage10StompImpactAtMs !== undefined &&
+              now < monster.stage10StompImpactAtMs,
+          )
+          .map((boss) => {
+            const position = getMonsterBoardPosition(boss);
+            return (
+              <span
+                key={`stomp-range-${boss.id}`}
+                className="stage10StompTelegraph"
+                style={{
+                  left: `${position.x}%`,
+                  top: `${position.y}%`,
+                  width: `${(STAGE10_STOMP_RADIUS_TILES * 2 * 100) / COLS}%`,
+                  height: `${(STAGE10_STOMP_RADIUS_TILES * 2 * 100) / ROWS}%`,
+                  animationDuration: `${STAGE10_STOMP_WARNING_MS / p.animationSpeed}ms`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                }}
+                aria-hidden="true"
+              />
+            );
+          })}
 
         {p.projectiles.filter((projectile) => projectile.delayMs <= 0).map((projectile) => {
           const [fromRow, fromCol] = [
@@ -423,6 +469,10 @@ export default function GameBoard(p: Props) {
           const isStage05Absorbing =
             m.stage05AbsorbingUntilMs !== undefined &&
             now < m.stage05AbsorbingUntilMs;
+          const isStage10Stomping =
+            m.bossStage === 10 &&
+            m.stage10StompImpactAtMs !== undefined &&
+            now < m.stage10StompImpactAtMs;
           const sniperSpecialTarget = p.projectiles.some((projectile) =>
             projectile.targetId === m.id &&
             projectile.sourceTypeId === "sniper" &&
@@ -525,9 +575,11 @@ export default function GameBoard(p: Props) {
                         : isStage05Absorbing
                           ? STAGE05_ABSORB_CAST_MS
                           : 1500
-                      : 480
+                      : m.bossStage === 10
+                        ? 720
+                        : 480
                   ) / p.animationSpeed}ms`,
-                  animationPlayState: p.animationPaused ? "paused" : "running",
+                  animationPlayState: p.animationPaused || isStage10Stomping ? "paused" : "running",
                 }}
                 aria-hidden="true"
               />
