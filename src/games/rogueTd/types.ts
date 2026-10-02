@@ -99,6 +99,10 @@ export interface Monster {
   stage05PendingHeal?: number;
   stage10NextStompAtMs?: number;
   stage10StompImpactAtMs?: number;
+  stage15State?: "phoenix" | "transforming" | "egg" | "hatching";
+  stage15PhaseEndsAtMs?: number;
+  stage15ReviveAtMs?: number;
+  stage15EggMaxHp?: number;
 }
 
 export interface Projectile {

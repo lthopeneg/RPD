@@ -473,13 +473,17 @@ export default function GameBoard(p: Props) {
             m.bossStage === 10 &&
             m.stage10StompImpactAtMs !== undefined &&
             now < m.stage10StompImpactAtMs;
+          const stage15State = m.stage15State ?? "phoenix";
           const sniperSpecialTarget = p.projectiles.some((projectile) =>
             projectile.targetId === m.id &&
             projectile.sourceTypeId === "sniper" &&
             projectile.effectType === "sniper"
           );
 
-          const hpPercent = Math.max(0, (m.hp / m.maxHp) * 100);
+          const displayedMaxHp = m.bossStage === 15 && stage15State !== "phoenix"
+            ? m.stage15EggMaxHp ?? m.maxHp
+            : m.maxHp;
+          const hpPercent = Math.max(0, (m.hp / displayedMaxHp) * 100);
           const hpColor =
             hpPercent > 50 ? "#22c55e" : hpPercent > 25 ? "#f97316" : "#ef4444";
           const monsterSpriteClass =
@@ -488,11 +492,18 @@ export default function GameBoard(p: Props) {
               : undefined) ??
             (m.bossStage ? BOSS_SPRITE_CLASSES[m.bossStage] : undefined) ??
             MONSTER_SPRITE_CLASSES[m.category];
+          const displayedSpriteClass = m.bossStage === 15
+            ? stage15State === "transforming" || stage15State === "hatching"
+              ? `bossStage15RebirthSprite ${stage15State === "hatching" ? "stage15Hatching" : ""}`
+              : stage15State === "egg"
+                ? "bossStage15EggSprite"
+                : monsterSpriteClass
+            : monsterSpriteClass;
 
           return (
             <span
               key={m.id}
-              className={`monster ${m.category} ${m.isBoss ? "boss" : ""} ${m.id === p.selectedBossId ? "selectedBoss" : ""} ${m.isFinalBoss ? "finalBoss" : ""} ${m.summonedByBossId !== undefined ? "stage05Skeleton" : ""} ${m.stage05BeingAbsorbed ? "stage05BeingAbsorbed" : ""} ${m.stage05ShieldActive ? "stage05SummonShield" : ""} ${isStage05Summoning ? "stage05Summoning" : ""} ${isStage05Absorbing ? "stage05Absorbing" : ""} ${isHit ? "hitFlash" : ""} ${isBurning ? "burning" : ""} ${isBossSniperHit ? "bossSniperHit" : ""} ${
+              className={`monster ${m.category} ${m.isBoss ? "boss" : ""} ${m.id === p.selectedBossId ? "selectedBoss" : ""} ${m.isFinalBoss ? "finalBoss" : ""} ${m.summonedByBossId !== undefined ? "stage05Skeleton" : ""} ${m.stage05BeingAbsorbed ? "stage05BeingAbsorbed" : ""} ${m.stage05ShieldActive ? "stage05SummonShield" : ""} ${isStage05Summoning ? "stage05Summoning" : ""} ${isStage05Absorbing ? "stage05Absorbing" : ""} ${m.bossStage === 15 ? `stage15-${stage15State}` : ""} ${isHit ? "hitFlash" : ""} ${isBurning ? "burning" : ""} ${isBossSniperHit ? "bossSniperHit" : ""} ${
                 isParalyzed ? "paralyzed" : isSlow ? "slowed" : ""
               }`}
               style={{
@@ -522,7 +533,7 @@ export default function GameBoard(p: Props) {
                   }
                 : undefined}
               title={m.isBoss
-                ? `${m.isFinalBoss ? `FINAL BOSS ${m.finalBossPhase}단계` : `${BOSS_NAMES[m.category]} 보스`} HP ${m.hp}/${m.maxHp} | 완주 ${m.laps}회 (제한 없음)`
+                ? `${m.isFinalBoss ? `FINAL BOSS ${m.finalBossPhase}단계` : `${BOSS_NAMES[m.category]} 보스`} HP ${m.hp}/${displayedMaxHp} | 완주 ${m.laps}회 (제한 없음)`
                 : `[${m.category}] HP ${m.hp}/${m.maxHp} | Laps: ${m.laps}/5`}
             >
               {m.bossStage === 5 && (
@@ -566,7 +577,7 @@ export default function GameBoard(p: Props) {
                 />
               )}
               <span
-                className={`monsterSprite ${m.isBoss ? "bossSprite" : ""} ${monsterSpriteClass} move-${moveDirection}`}
+                className={`monsterSprite ${m.isBoss ? "bossSprite" : ""} ${displayedSpriteClass} move-${moveDirection}`}
                 style={{
                   animationDuration: `${(
                     m.bossStage === 5
@@ -577,6 +588,12 @@ export default function GameBoard(p: Props) {
                           : 1500
                       : m.bossStage === 10
                         ? 720
+                        : m.bossStage === 15
+                          ? stage15State === "transforming" || stage15State === "hatching"
+                            ? 1200
+                            : stage15State === "egg"
+                              ? 1000
+                              : 840
                         : 480
                   ) / p.animationSpeed}ms`,
                   animationPlayState: p.animationPaused || isStage10Stomping ? "paused" : "running",
@@ -591,6 +608,11 @@ export default function GameBoard(p: Props) {
               )}
               {isBurning && <span className="burnImpact" aria-hidden="true" />}
               {isBossSniperHit && <span className="bossSniperBurst" aria-hidden="true" />}
+              {stage15State === "egg" && m.stage15ReviveAtMs !== undefined && (
+                <span className="stage15EggTimer">
+                  부활 {Math.max(0, (m.stage15ReviveAtMs - now) / 1000).toFixed(1)}s
+                </span>
+              )}
 
               {/* 완주 횟수 라벨 배지 */}
               {m.laps > 0 && (
@@ -616,7 +638,7 @@ export default function GameBoard(p: Props) {
                   }}
                 />
                 <span className="monsterHpText">
-                  {m.hp}/{m.maxHp}
+                  {m.hp}/{displayedMaxHp}
                 </span>
               </span>
             </span>

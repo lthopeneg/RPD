@@ -326,6 +326,8 @@ body {
 .enemyFlySprite { background-image: url("../images/enemy-fly-sprite.png"); }
 .bossStage10Sprite { background-image: url("../images/boss-stage10-sprite.png"); }
 .bossStage15Sprite { background-image: url("../images/boss-stage15-sprite.png"); }
+.bossStage15RebirthSprite { background-image: url("../images/boss-stage15-rebirth-sprite.png"); }
+.bossStage15EggSprite { background-image: url("../images/boss-stage15-egg-sprite.png"); }
 .bossStage20Sprite { background-image: url("../images/boss-stage20-sprite.png"); }
 .bossStage25Sprite { background-image: url("../images/boss-stage25-sprite.png"); }
 .bossStage30Sprite { background-image: url("../images/boss-stage30-sprite.png"); }
@@ -398,6 +400,57 @@ body {
 .monsterSprite.bossStage10Sprite.move-right { --monster-row: 100%; }
 .monsterSprite.bossStage10Sprite.move-left {
   transform: translateY(-40%) scaleX(-1);
+}
+
+/* Stage 15 uses one right-facing side row and mirrors it for left movement.
+   The six-step cycle returns through the middle poses for a continuous flap. */
+.monsterSprite.bossStage15Sprite {
+  background-size: 400% 300%;
+  animation: phoenixWingFlap 840ms linear infinite;
+  transform: translateY(-46%) scale(1.1);
+  transform-origin: center bottom;
+}
+.monsterSprite.bossStage15Sprite.move-down { --monster-row: 0%; }
+.monsterSprite.bossStage15Sprite.move-up { --monster-row: 50%; }
+.monsterSprite.bossStage15Sprite.move-left,
+.monsterSprite.bossStage15Sprite.move-right { --monster-row: 100%; }
+.monsterSprite.bossStage15Sprite.move-left {
+  transform: translateY(-46%) scale(-1.1, 1.1);
+}
+.monsterSprite.bossStage15RebirthSprite {
+  background-size: 400% 100%;
+  transform: translateY(-46%) scale(1.1);
+  transform-origin: center bottom;
+  animation: phoenixRebirth 1200ms linear 1 forwards;
+}
+.monsterSprite.bossStage15RebirthSprite.stage15Hatching {
+  animation-direction: reverse;
+}
+.monsterSprite.bossStage15EggSprite {
+  background-size: 100% 100%;
+  background-position: center;
+  transform: translateY(-42%) scale(0.92);
+  transform-origin: center bottom;
+  animation: phoenixEggPulse 1000ms ease-in-out infinite;
+}
+.stage15EggTimer {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  bottom: calc(100% + 16px);
+  transform: translateX(-50%);
+  min-width: 58px;
+  padding: 2px 5px;
+  border: 1px solid rgba(251, 146, 60, 0.9);
+  border-radius: 5px;
+  background: rgba(69, 10, 10, 0.9);
+  color: #fef3c7;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 /* Keep the generated body rigid and animate the separately generated
@@ -663,6 +716,27 @@ body {
   25%, 49.99% { background-position: 33.333% var(--monster-row); }
   50%, 74.99% { background-position: 66.667% var(--monster-row); }
   75%, 100% { background-position: 100% var(--monster-row); }
+}
+
+@keyframes phoenixWingFlap {
+  0%, 16.666% { background-position: 0 var(--monster-row); }
+  16.667%, 33.333% { background-position: 33.333% var(--monster-row); }
+  33.334%, 50% { background-position: 66.667% var(--monster-row); }
+  50.001%, 66.666% { background-position: 100% var(--monster-row); }
+  66.667%, 83.333% { background-position: 66.667% var(--monster-row); }
+  83.334%, 100% { background-position: 33.333% var(--monster-row); }
+}
+
+@keyframes phoenixRebirth {
+  0%, 24.99% { background-position: 0 0; }
+  25%, 49.99% { background-position: 33.333% 0; }
+  50%, 74.99% { background-position: 66.667% 0; }
+  75%, 100% { background-position: 100% 0; }
+}
+
+@keyframes phoenixEggPulse {
+  0%, 100% { filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.62)) drop-shadow(0 0 4px rgba(249, 115, 22, 0.7)); }
+  50% { filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.62)) drop-shadow(0 0 11px rgba(250, 204, 21, 0.95)); }
 }
 
 .monster.boss {

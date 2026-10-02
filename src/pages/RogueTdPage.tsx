@@ -69,6 +69,12 @@ import {
   STAGE10_STOMP_RADIUS_TILES,
   STAGE10_STOMP_STUN_MS,
   STAGE10_STOMP_WARNING_MS,
+  STAGE15_EGG_DAMAGE_REDUCTION,
+  STAGE15_EGG_HATCH_DELAY_MS,
+  STAGE15_EGG_HP_RATIO,
+  STAGE15_HATCH_MS,
+  STAGE15_REVIVE_HP_RATIO,
+  STAGE15_TRANSFORM_MS,
   UNIT_SELL_PRICES,
   UNIT_TYPES,
   UPGRADE_DAMAGE_PER_LEVEL,
@@ -615,6 +621,7 @@ export default function RogueTdPage() {
       stage10NextStompAtMs: bossStage === 10
         ? gameTimeMs.current + STAGE10_FIRST_STOMP_DELAY_MS
         : undefined,
+      stage15State: bossStage === 15 ? "phoenix" : undefined,
     }));
     const nextMonsters = running ? [...monstersRef.current, ...created] : created;
     monstersRef.current = nextMonsters;
@@ -1026,6 +1033,7 @@ export default function RogueTdPage() {
           stage10NextStompAtMs: wave === 10
             ? gameNow + STAGE10_FIRST_STOMP_DELAY_MS
             : undefined,
+          stage15State: wave === 15 ? "phoenix" : undefined,
         });
       }
 
@@ -1181,6 +1189,47 @@ export default function RogueTdPage() {
         }
       }
 
+      // 15스테이지 보스: 사망하면 알로 변해 8초 동안 부활을 준비한다.
+      // 알을 파괴하지 못하면 최대 체력의 50%로 되살아나며 이 과정은 반복된다.
+      const stage15Bosses = monstersRef.current.filter(
+        (monster) => monster.hp > 0 && monster.isBoss && monster.bossStage === 15,
+      );
+      for (const boss of stage15Bosses) {
+        if (
+          boss.stage15State === "transforming" &&
+          boss.stage15PhaseEndsAtMs !== undefined &&
+          gameNow >= boss.stage15PhaseEndsAtMs
+        ) {
+          boss.stage15State = "egg";
+          boss.stage15PhaseEndsAtMs = undefined;
+          boss.stage15ReviveAtMs = gameNow + STAGE15_EGG_HATCH_DELAY_MS;
+          setStatus("🥚 불사조의 알이 부활을 준비합니다. 8초 안에 파괴하세요!");
+          addLog("영겁의 불사조가 알로 변했습니다. 부활 전에 파괴해야 합니다.");
+        } else if (
+          boss.stage15State === "egg" &&
+          boss.stage15ReviveAtMs !== undefined &&
+          gameNow >= boss.stage15ReviveAtMs
+        ) {
+          boss.stage15State = "hatching";
+          boss.stage15ReviveAtMs = undefined;
+          boss.stage15PhaseEndsAtMs = gameNow + STAGE15_HATCH_MS;
+          setStatus("🔥 알이 갈라지며 불사조가 다시 태어납니다!");
+        } else if (
+          boss.stage15State === "hatching" &&
+          boss.stage15PhaseEndsAtMs !== undefined &&
+          gameNow >= boss.stage15PhaseEndsAtMs
+        ) {
+          boss.stage15State = "phoenix";
+          boss.stage15PhaseEndsAtMs = undefined;
+          boss.hp = Math.max(1, Math.round(boss.maxHp * STAGE15_REVIVE_HP_RATIO));
+          boss.slowUntilMs = undefined;
+          boss.paralyzeUntilMs = undefined;
+          boss.statusImmunityUntilMs = gameNow + 1000;
+          setStatus("🪽 영겁의 불사조가 최대 체력의 50%로 부활했습니다!");
+          addLog("영겁의 불사조가 불길 속에서 부활했습니다.");
+        }
+      }
+
       // 2. 몬스터 이동 & 완주(laps) 순환 이동 처리
       let instantGameOver = false;
 
@@ -1212,6 +1261,7 @@ export default function RogueTdPage() {
             m.stage10StompImpactAtMs !== undefined &&
             gameNow < m.stage10StompImpactAtMs
           )
+          || (m.bossStage === 15 && (m.stage15State ?? "phoenix") !== "phoenix")
         ) {
           currentSpeed = 0;
         } else if (m.paralyzeUntilMs && gameNow < m.paralyzeUntilMs) {
@@ -1289,19 +1339,38 @@ export default function RogueTdPage() {
         ));
 
       const dealDamage = (m: Monster, damage: number, sourceUnitId: number) => {
+        const stage15State = m.stage15State ?? "phoenix";
         if (
           m.hp <= 0 ||
           damage <= 0 ||
           m.stage05ShieldActive ||
-          m.stage05BeingAbsorbed
+          m.stage05BeingAbsorbed ||
+          (m.bossStage === 15 && (stage15State === "transforming" || stage15State === "hatching"))
         ) return 0;
-        const actualDamage = Math.min(m.hp, damage);
+        const reducedDamage = m.bossStage === 15 && stage15State === "egg"
+          ? Math.max(1, Math.round(damage * (1 - STAGE15_EGG_DAMAGE_REDUCTION)))
+          : damage;
+        const actualDamage = Math.min(m.hp, reducedDamage);
         m.hp -= actualDamage;
         waveDamageRef.current[sourceUnitId] =
           (waveDamageRef.current[sourceUnitId] ?? 0) + actualDamage;
         m.lastHitTime = gameNow;
-        if (m.hp <= 0 && !m.noKillGold) {
-          killGold += m.isBoss ? BOSS_KILL_GOLD : MONSTER_KILL_GOLD;
+        if (m.hp <= 0) {
+          if (m.bossStage === 15 && stage15State === "phoenix") {
+            const eggHp = Math.max(1, Math.round(m.maxHp * STAGE15_EGG_HP_RATIO));
+            m.stage15State = "transforming";
+            m.stage15EggMaxHp = eggHp;
+            m.stage15PhaseEndsAtMs = gameNow + STAGE15_TRANSFORM_MS;
+            m.stage15ReviveAtMs = undefined;
+            m.hp = eggHp;
+            m.slowUntilMs = undefined;
+            m.paralyzeUntilMs = undefined;
+            m.statusImmunityUntilMs = undefined;
+            setStatus("🔥 영겁의 불사조가 불길에 휩싸이며 알로 변합니다!");
+            addLog("영겁의 불사조가 소멸하지 않고 불타는 알로 변하기 시작했습니다.");
+          } else if (!m.noKillGold) {
+            killGold += m.isBoss ? BOSS_KILL_GOLD : MONSTER_KILL_GOLD;
+          }
         }
         return actualDamage;
       };
@@ -1445,6 +1514,7 @@ export default function RogueTdPage() {
             m.hp > 0 &&
             !m.stage05ShieldActive &&
             !m.stage05BeingAbsorbed &&
+            !(m.bossStage === 15 && (m.stage15State === "transforming" || m.stage15State === "hatching")) &&
             getDistance(m) <= rangeTiles,
         );
 
