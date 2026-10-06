@@ -119,7 +119,8 @@ export const getBossCategory = (wave: number): MonsterCategory => {
 };
 export const getBossHp = (wave: number) => {
   if (isFinalStage(wave)) return 20000;
-  return Math.round(BOSS_HP * 3 * 1.75 ** (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1));
+  const baseHp = BOSS_HP * 3 * 1.75 ** (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1);
+  return Math.round(baseHp * (wave === 20 ? 0.75 : 1));
 };
 // 1차 밸런스: 인간은 기준형, 육지는 느리고 튼튼하며 조류는 빠르고 약하다.
 export const MONSTER_STATS: Record<MonsterCategory, { hp: number; speed: number }> = {
@@ -168,12 +169,13 @@ export const STAGE15_EGG_DAMAGE_REDUCTION = 0.3;
 export const STAGE15_REVIVE_HP_RATIO = 0.5;
 export const STAGE20_FIRST_SHIELD_DELAY_MS = 8000;
 export const STAGE20_SHIELD_CAST_MS = 1500;
-export const STAGE20_SHIELD_REFRESH_MS = 12000;
+export const STAGE20_SHIELD_REFRESH_MS = 15000;
 export const STAGE20_SHIELD_RATIO = 0.7;
+export const STAGE20_SHIELD_SEGMENTS = 4;
 export const STAGE20_SHIELD_DAMAGE_REDUCTION = 0.5;
 export const STAGE20_SHIELDED_SPEED_RATIO = 0.2;
-export const STAGE20_BREAK_STUN_MS = 4000;
-export const STAGE20_BREAK_COOLDOWN_MS = 8000;
+export const STAGE20_BREAK_STUN_MS = 8000;
+export const STAGE20_BREAK_COOLDOWN_MS = 15000;
 export const STAGE20_BREAK_DAMAGE_MULTIPLIER = 2;
 export const STAGE25_SPEED_RATIO = 0.5;
 export const STAGE25_FIRST_REFORGE_DELAY_MS = 8000;

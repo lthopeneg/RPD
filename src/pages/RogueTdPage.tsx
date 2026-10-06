@@ -87,6 +87,7 @@ import {
   STAGE20_SHIELD_DAMAGE_REDUCTION,
   STAGE20_SHIELD_RATIO,
   STAGE20_SHIELD_REFRESH_MS,
+  STAGE20_SHIELD_SEGMENTS,
   STAGE20_SHIELDED_SPEED_RATIO,
   STAGE25_SPEED_RATIO,
   STAGE25_FIRST_REFORGE_DELAY_MS,
@@ -1461,14 +1462,29 @@ export default function RogueTdPage() {
           boss.stage20CastEndsAtMs !== undefined &&
           gameNow >= boss.stage20CastEndsAtMs
         ) {
-          const shieldMaxHp = Math.max(1, Math.round(boss.maxHp * STAGE20_SHIELD_RATIO));
+          const currentShieldHp = boss.stage20ShieldHp ?? 0;
+          const isPartialRecharge = currentShieldHp > 0 && boss.stage20ShieldMaxHp !== undefined;
+          const shieldMaxHp = isPartialRecharge
+            ? boss.stage20ShieldMaxHp!
+            : Math.max(1, Math.round(boss.hp * STAGE20_SHIELD_RATIO));
+          const nextShieldSegment = Math.min(
+            STAGE20_SHIELD_SEGMENTS,
+            Math.floor((currentShieldHp * STAGE20_SHIELD_SEGMENTS) / shieldMaxHp) + 1,
+          );
+          const rechargedShieldHp = isPartialRecharge
+            ? Math.round((shieldMaxHp * nextShieldSegment) / STAGE20_SHIELD_SEGMENTS)
+            : shieldMaxHp;
           boss.stage20State = "shielded";
           boss.stage20CastEndsAtMs = undefined;
           boss.stage20ShieldMaxHp = shieldMaxHp;
-          boss.stage20ShieldHp = shieldMaxHp;
+          boss.stage20ShieldHp = Math.round(rechargedShieldHp);
           boss.stage20NextShieldAtMs = gameNow + STAGE20_SHIELD_REFRESH_MS;
-          setStatus("🛡️ 성채기사가 최대 체력의 70%에 해당하는 보호막을 펼쳤습니다!");
-          addLog("20스테이지 보스가 보라색 성채 보호막을 전개했습니다.");
+          setStatus(isPartialRecharge
+            ? "🛡️ 성채기사가 보호막을 다음 구간까지 회복했습니다!"
+            : "🛡️ 성채기사가 현재 체력의 70%에 해당하는 보호막을 펼쳤습니다!");
+          addLog(isPartialRecharge
+            ? "20스테이지 보스가 보호막 한 구간을 재충전했습니다."
+            : "20스테이지 보스가 보라색 성채 보호막을 전개했습니다.");
         } else if (
           boss.stage20State === "stunned" &&
           boss.stage20StunnedUntilMs !== undefined &&
@@ -1476,7 +1492,6 @@ export default function RogueTdPage() {
         ) {
           boss.stage20State = "waiting";
           boss.stage20StunnedUntilMs = undefined;
-          boss.stage20NextShieldAtMs = gameNow + STAGE20_BREAK_COOLDOWN_MS;
           setStatus("⚔️ 성채기사가 기절에서 회복했습니다.");
         } else if (
           boss.stage20State !== "charging" &&
@@ -1894,12 +1909,12 @@ export default function RogueTdPage() {
             m.stage20State = "stunned";
             m.stage20ShieldHp = 0;
             m.stage20CastEndsAtMs = undefined;
-            m.stage20NextShieldAtMs = undefined;
+            m.stage20NextShieldAtMs = gameNow + STAGE20_BREAK_COOLDOWN_MS;
             m.stage20StunnedUntilMs = gameNow + STAGE20_BREAK_STUN_MS;
             m.stage20ShieldBreakUntilMs = gameNow + 700;
             m.slowUntilMs = undefined;
             m.paralyzeUntilMs = undefined;
-            setStatus("💥 보호막 파괴! 성채기사가 4초간 기절하고 받는 피해가 두 배가 됩니다!");
+            setStatus("💥 보호막 파괴! 성채기사가 8초간 기절하고 받는 피해가 두 배가 됩니다!");
             addLog("20스테이지 보스의 보호막을 파괴했습니다. 약점 노출 시간이 시작됩니다.");
           }
           return actualShieldDamage;

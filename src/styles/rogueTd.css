@@ -1479,9 +1479,22 @@ body {
   background: linear-gradient(90deg, #6d28d9, #c084fc, #f5f3ff);
   transition: width 80ms ease-out;
 }
+.stage20ShieldSegments {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    transparent 24%, rgba(15, 23, 42, 0.95) 24% 26%,
+    transparent 26% 49%, rgba(15, 23, 42, 0.95) 49% 51%,
+    transparent 51% 74%, rgba(15, 23, 42, 0.95) 74% 76%,
+    transparent 76%
+  );
+  pointer-events: none;
+}
 .stage20ShieldBarText {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: block;
   color: #fff;
   font-size: 6px;
@@ -2374,30 +2387,6 @@ body {
 .unitWrapper.stunned .unit {
   opacity: 0.72;
   filter: grayscale(0.35) brightness(0.78) drop-shadow(0 3px 2px rgba(0, 0, 0, 0.72));
-}
-.unitProtectionBadge {
-  position: absolute;
-  z-index: 13;
-  right: 3px;
-  top: 6px;
-  width: 9px;
-  height: 7px;
-  border: 1px solid #dbeafe;
-  border-radius: 2px;
-  background: #334155;
-  box-shadow: 0 0 3px #000, 0 0 4px rgba(147, 197, 253, 0.72);
-  pointer-events: none;
-}
-.unitProtectionBadge::before {
-  content: "";
-  position: absolute;
-  left: 1px;
-  top: -6px;
-  width: 5px;
-  height: 6px;
-  border: 1px solid #dbeafe;
-  border-bottom: 0;
-  border-radius: 5px 5px 0 0;
 }
 .unitStunStars {
   position: absolute;

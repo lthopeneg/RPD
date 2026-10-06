@@ -421,9 +421,6 @@ export default function GameBoard(p: Props) {
                       <i>★</i><i>★</i><i>★</i>
                     </span>
                   )}
-                  {u.protected && (
-                    <span className="unitProtectionBadge" aria-label="판매 보호 중" title="판매 보호 중" />
-                  )}
                   <UnitTooltip
                     typeId={u.typeId}
                     tier={u.tier}
@@ -946,6 +943,7 @@ export default function GameBoard(p: Props) {
                     className="stage20ShieldBarFill"
                     style={{ width: `${stage20ShieldPercent}%` }}
                   />
+                  <span className="stage20ShieldSegments" aria-hidden="true" />
                   <span className="stage20ShieldBarText">
                     {Math.ceil(m.stage20ShieldHp ?? 0)}/{m.stage20ShieldMaxHp}
                   </span>
