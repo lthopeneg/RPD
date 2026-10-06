@@ -5,6 +5,9 @@ import {
   SNIPER_EXECUTE_CHANCE,
   UNIT_TYPES,
   UPGRADE_DAMAGE_PER_LEVEL,
+  getUnitTierAttackSpeedBonus,
+  getUnitTierDamageMultiplier,
+  getUnitTierRangeBonus,
 } from "../../games/rogueTd/constants";
 import {
   AIR_DAMAGE_BONUS,
@@ -46,15 +49,17 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
   const def = UNIT_TYPES[unit.typeId];
   const portraitClass = UNIT_PORTRAIT_CLASSES[unit.typeId];
   const upgradeLevels = getUpgradeLevels(upgrades, unit.typeId);
-  const baseDamage = def.damage * (1 + (unit.tier - 1) * 0.5);
+  const baseDamage = def.damage * getUnitTierDamageMultiplier(unit.tier, def.unitClass);
   const upgradeDamage = def.damage * upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL;
-  const baseAttacksPerSecond = 1000 / def.attackIntervalMs;
   const attackSpeedBonus = def.unitClass === "warrior"
     ? WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior]
     : 0;
+  const tierAttackSpeedBonus = getUnitTierAttackSpeedBonus(unit.tier, def.unitClass);
+  const attacksPerSecond = 1000 / def.attackIntervalMs * (1 + attackSpeedBonus + tierAttackSpeedBonus);
   const rangeBonus = def.unitClass === "ranger"
     ? RANGER_RANGE_BONUS_TILES[synergy.classTiers.ranger]
     : 0;
+  const tierRangeBonus = getUnitTierRangeBonus(unit.tier, def.unitClass);
   const mageBonus = def.unitClass === "mage"
     ? MAGE_STATUS_CHANCE_BONUS[synergy.classTiers.mage]
     : 0;
@@ -91,8 +96,8 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
           <div><dt>직업</dt><dd>{CLASS_NAMES[def.unitClass]}</dd></div>
           <div><dt>특화</dt><dd>{SPEC_NAMES[def.specType]}</dd></div>
           <div className="unitDetailGap"><dt>공격력</dt><dd>{format(baseDamage)} <b className="upgradeStat">(+{format(upgradeDamage)})</b></dd></div>
-          <div><dt>공격속도</dt><dd>{format(baseAttacksPerSecond)}회/초 {attackSpeedBonus > 0 && <b className="synergyStat">(+{percent(attackSpeedBonus)})</b>}</dd></div>
-          <div><dt>사거리</dt><dd>{format(def.rangeTiles)}칸 {rangeBonus > 0 && <b className="synergyStat">(+{format(rangeBonus)}칸)</b>}</dd></div>
+          <div><dt>공격속도</dt><dd>{format(attacksPerSecond)}회/초 {attackSpeedBonus > 0 && <b className="synergyStat">(+{percent(attackSpeedBonus)})</b>}</dd></div>
+          <div><dt>사거리</dt><dd>{format(def.rangeTiles + tierRangeBonus + rangeBonus)}칸 {rangeBonus > 0 && <b className="synergyStat">(+{format(rangeBonus)}칸)</b>}</dd></div>
           <div><dt>{specTarget} 피해</dt><dd>{specBonus > 0 ? <b className="synergyStat">+{percent(specBonus)}</b> : "없음"}</dd></div>
         </dl>
         <div className="unitSpecialEffect"><strong>특수효과</strong><p>{specialEffect}</p></div>

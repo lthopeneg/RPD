@@ -52,16 +52,158 @@ body {
 }
 .board {
   position: relative;
+  isolation: isolate;
   display: grid;
   width: 100%;
   min-width: 700px;
   min-height: 0;
   border: 1px solid #444b57;
   background: #171a20;
-  overflow: hidden;
+  overflow: visible;
 }
 .board.stompShaking {
   animation: stage10BoardShake 450ms linear 1;
+}
+.bossStageWarning {
+  position: absolute;
+  z-index: 120;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(20, 0, 0, 0.56), rgba(5, 5, 8, 0.12) 48%, transparent 72%);
+  animation: bossWarningSequence 2.8s ease-in-out both;
+}
+.bossWarningTriangle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(82px, 13%, 132px);
+  aspect-ratio: 1.12;
+  background: #ef2028;
+  clip-path: polygon(50% 0, 100% 91%, 0 91%);
+  filter: drop-shadow(0 0 6px #ef2028) drop-shadow(0 0 15px rgba(239, 32, 40, 0.65));
+}
+.bossWarningTriangle::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  background: rgba(17, 18, 23, 0.94);
+  clip-path: polygon(50% 0, 100% 91%, 0 91%);
+}
+.bossWarningTriangle i {
+  position: relative;
+  z-index: 1;
+  margin-top: 13%;
+  color: #ff3138;
+  font-size: clamp(44px, 6vw, 72px);
+  line-height: 1;
+  font-style: normal;
+  font-weight: 1000;
+  text-shadow: 0 0 9px rgba(255, 49, 56, 0.9);
+}
+.bossStageWarning strong {
+  color: #ff3138;
+  font-size: clamp(24px, 3vw, 42px);
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 5px #ef2028, 0 0 16px rgba(239, 32, 40, 0.85);
+  animation: bossWarningFlicker 360ms steps(2, end) infinite;
+}
+.bossStageWarning em {
+  margin-top: 5px;
+  color: #fecaca;
+  font-size: clamp(10px, 1.1vw, 15px);
+  font-style: normal;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+@keyframes bossWarningSequence {
+  0% { opacity: 0; transform: scale(.72); }
+  12% { opacity: 1; transform: scale(1.04); }
+  20% { transform: scale(.98); }
+  28%, 68% { opacity: 1; transform: scale(1); }
+  76% { opacity: .35; }
+  83% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.06); }
+}
+@keyframes bossWarningFlicker {
+  0%, 45% { opacity: 1; }
+  46%, 62% { opacity: .45; }
+  63%, 100% { opacity: 1; }
+}
+.board .terrainTile,
+.board .structureTile,
+.board .endpointMarker {
+  transition: filter 1867ms ease;
+}
+.board.finalBossAbsorbing .terrainTile,
+.board.finalBossAbsorbing .structureTile,
+.board.finalBossAbsorbing .endpointMarker,
+.board.finalBossDimmed .terrainTile,
+.board.finalBossDimmed .structureTile,
+.board.finalBossDimmed .endpointMarker {
+  filter: grayscale(1) brightness(0.62);
+}
+.cell.lightDrainedUnit .unitWrapper {
+  filter: grayscale(1) brightness(0.7);
+  transition: filter 450ms ease;
+}
+.board.finalBossAbsorbing::after,
+.board.finalBossReleasing::after,
+.board.finalBossTransitionFlash::after,
+.board.finalBossDimmed::after {
+  content: "";
+  position: absolute;
+  z-index: 40;
+  inset: 0;
+  pointer-events: none;
+  clip-path: inset(0);
+  transform-origin: var(--final-boss-x, 50%) var(--final-boss-y, 50%);
+}
+.board.finalBossAbsorbing::after {
+  background: radial-gradient(circle at var(--final-boss-x, 50%) var(--final-boss-y, 50%), transparent 0 calc(var(--final-light-radius) - 5%), rgba(255,255,255,0.94) var(--final-light-radius), rgba(255,255,255,0.38) calc(var(--final-light-radius) + 8%), transparent calc(var(--final-light-radius) + 20%));
+  animation: finalBossLightCollapse 1867ms ease-in forwards;
+}
+.board.finalBossReleasing::after {
+  background: radial-gradient(circle at var(--final-boss-x, 50%) var(--final-boss-y, 50%), transparent 0 calc(var(--final-light-radius) - 5%), rgba(255,255,255,0.94) var(--final-light-radius), rgba(255,255,255,0.38) calc(var(--final-light-radius) + 8%), transparent calc(var(--final-light-radius) + 20%));
+  animation: finalBossLightRelease 1867ms ease-out forwards;
+}
+.board.finalBossDimmed::after {
+  background: #fff;
+  animation: finalBossMapFlash 420ms ease-out forwards;
+}
+.board.finalBossTransitionFlash::after {
+  background: #fff;
+  animation: finalBossTransitionFlash 420ms ease-in-out forwards;
+}
+@property --final-light-radius {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 145%;
+}
+@keyframes finalBossLightCollapse {
+  0% { --final-light-radius: 145%; opacity: 0.15; }
+  18% { opacity: 0.9; }
+  82% { opacity: 0.78; }
+  100% { --final-light-radius: 0%; opacity: 0; }
+}
+@keyframes finalBossLightRelease {
+  0% { --final-light-radius: 0%; opacity: 0.95; }
+  76% { opacity: 0.82; }
+  100% { --final-light-radius: 145%; opacity: 0; }
+}
+@keyframes finalBossMapFlash {
+  0% { opacity: 0.95; }
+  100% { opacity: 0; }
+}
+@keyframes finalBossTransitionFlash {
+  0% { opacity: 0; }
+  35% { opacity: 1; }
+  100% { opacity: 0; }
 }
 @keyframes stage10BoardShake {
   0%, 100% { transform: translate(0, 0); }
@@ -120,6 +262,9 @@ body {
   font-size: 14px;
   line-height: 1;
   appearance: none;
+}
+.cell.unitOccupied {
+  overflow: visible;
 }
 .cell.natural {
   background: #383126;
@@ -213,7 +358,7 @@ body {
 }
 .unit {
   position: absolute;
-  z-index: 4;
+  z-index: 5;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
@@ -222,6 +367,16 @@ body {
 .pathMarker-1 { animation-delay: -300ms; }
 .pathMarker-2 { animation-delay: -150ms; }
 .pathMarker-3 { animation-delay: 0ms; }
+.stage25CellWarning {
+  position: absolute;
+  z-index: 3;
+  inset: 2px;
+  pointer-events: none;
+  border: 2px solid rgba(255, 80, 80, 0.95);
+  background: rgba(220, 38, 38, 0.26);
+  box-shadow: inset 0 0 12px rgba(255, 30, 30, 0.8), 0 0 8px rgba(255, 60, 60, 0.85);
+  animation: stage25CellPulse 420ms ease-in-out infinite alternate;
+}
 @keyframes pathSparkle {
   from { opacity: 0.45; transform: translate(-50%, -50%) scale(0.7); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
@@ -331,12 +486,10 @@ body {
 .bossStage20Sprite { background-image: url("../images/boss-stage20-sprite.png"); }
 .bossStage25Sprite { background-image: url("../images/boss-stage25-sprite.png"); }
 .bossStage30Sprite { background-image: url("../images/boss-stage30-sprite.png"); }
-.bossStage33Sprite { background-image: url("../images/boss-stage33-sprite.png"); }
-.bossStage34Sprite { background-image: url("../images/boss-stage34-sprite.png"); }
-.bossStage35Sprite { background-image: url("../images/boss-stage35-sprite.png"); }
-.finalBossPhase1Sprite { background-image: url("../images/final-boss-phase1-sprite.png"); }
+.finalBossPhase1Sprite { background-image: url("../images/final-boss-phase1-body-test.png"); }
 .finalBossPhase2Sprite { background-image: url("../images/final-boss-phase2-sprite.png"); }
 .finalBossPhase3Sprite { background-image: url("../images/final-boss-phase3-sprite.png"); }
+.finalBossPhase4Sprite { background-image: url("../images/final-boss-phase4-core.png"); }
 .monsterSprite.move-down { --monster-row: 0%; }
 .monsterSprite.move-up { --monster-row: 33.333%; }
 .monsterSprite.move-left { --monster-row: 66.667%; }
@@ -416,6 +569,219 @@ body {
 .monsterSprite.bossStage15Sprite.move-right { --monster-row: 100%; }
 .monsterSprite.bossStage15Sprite.move-left {
   transform: translateY(-46%) scale(-1.1, 1.1);
+}
+
+/* Stage 20: front/back use 1-2-3-4-5-6-5-4-3-2, while the side row uses
+   the approved 1-2-3-5-6-5-3-2 cycle. The left-facing view mirrors the
+   single side row so both directions keep identical proportions. */
+.monsterSprite.bossStage20Sprite {
+  background-size: 600% 300%;
+  animation: bossStage20FrontBackWalk 1400ms linear infinite;
+  transform: translateY(-40%) scale(1.05);
+  transform-origin: center bottom;
+}
+.monsterSprite.bossStage20Sprite.move-down { --monster-row: 0%; }
+.monsterSprite.bossStage20Sprite.move-up { --monster-row: 50%; }
+.monsterSprite.bossStage20Sprite.move-left,
+.monsterSprite.bossStage20Sprite.move-right {
+  --monster-row: 100%;
+  animation-name: bossStage20SideWalk;
+}
+.monsterSprite.bossStage20Sprite.move-left {
+  transform: translateY(-40%) scale(-1.05, 1.05);
+}
+
+@keyframes bossStage20FrontBackWalk {
+  0%, 9.99% { background-position: 0 var(--monster-row); }
+  10%, 19.99% { background-position: 20% var(--monster-row); }
+  20%, 29.99% { background-position: 40% var(--monster-row); }
+  30%, 39.99% { background-position: 60% var(--monster-row); }
+  40%, 49.99% { background-position: 80% var(--monster-row); }
+  50%, 59.99% { background-position: 100% var(--monster-row); }
+  60%, 69.99% { background-position: 80% var(--monster-row); }
+  70%, 79.99% { background-position: 60% var(--monster-row); }
+  80%, 89.99% { background-position: 40% var(--monster-row); }
+  90%, 100% { background-position: 20% var(--monster-row); }
+}
+
+@keyframes bossStage20SideWalk {
+  0%, 12.49% { background-position: 0 var(--monster-row); }
+  12.5%, 24.99% { background-position: 20% var(--monster-row); }
+  25%, 37.49% { background-position: 40% var(--monster-row); }
+  37.5%, 49.99% { background-position: 60% var(--monster-row); }
+  50%, 62.49% { background-position: 80% var(--monster-row); }
+  62.5%, 74.99% { background-position: 60% var(--monster-row); }
+  75%, 87.49% { background-position: 40% var(--monster-row); }
+  87.5%, 100% { background-position: 20% var(--monster-row); }
+}
+
+/* Stage 25 uses five front/back poses (1-2-3-4-5-4-3-2) and four side
+   poses (1-2-3-4-3-2). Left movement mirrors the approved right-facing row. */
+.monsterSprite.bossStage25Sprite {
+  background-size: 500% 300%;
+  animation: bossStage25FrontBackWalk 2060ms linear infinite;
+  transform: translateY(-43%) scale(1.12);
+  transform-origin: center bottom;
+}
+.monsterSprite.bossStage25Sprite.move-down { --monster-row: 0%; }
+.monsterSprite.bossStage25Sprite.move-up { --monster-row: 50%; }
+.monsterSprite.bossStage25Sprite.move-left,
+.monsterSprite.bossStage25Sprite.move-right {
+  --monster-row: 100%;
+  animation-name: bossStage25SideWalk;
+}
+.monsterSprite.bossStage25Sprite.move-left {
+  transform: translateY(-43%) scale(-1.12, 1.12);
+}
+
+/* Stage 30 is a rigid floating fortress. Its four frames animate only the
+   arcane core, ring and orbiting fragments; the left view mirrors the side row. */
+.monsterSprite.bossStage30Sprite {
+  background-size: 400% 300%;
+  animation: none;
+  transform: translateY(-44%) scale(1.16);
+  transform-origin: center center;
+}
+.monsterSprite.bossStage30Sprite.move-down { --monster-row: 0%; }
+.monsterSprite.bossStage30Sprite.move-up { --monster-row: 50%; }
+.monsterSprite.bossStage30Sprite.move-left,
+.monsterSprite.bossStage30Sprite.move-right { --monster-row: 100%; }
+.monsterSprite.bossStage30Sprite.move-left {
+  transform: translateY(-44%) scale(-1.16, 1.16);
+}
+
+.stage30OrbitEffect {
+  position: absolute;
+  z-index: 6;
+  inset: -12px;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  transform-origin: center center;
+  animation: astrayonStoneOrbit 2600ms linear infinite;
+  filter:
+    brightness(1.35)
+    saturate(1.35)
+    drop-shadow(0 0 3px #67e8f9)
+    drop-shadow(0 0 7px rgba(6, 182, 212, 0.95));
+}
+.stage30OrbitEffect i {
+  position: absolute;
+  display: block;
+  width: 13px;
+  height: 18px;
+  clip-path: polygon(50% 0, 92% 28%, 78% 82%, 48% 100%, 10% 72%, 4% 25%);
+  border: 1px solid rgba(165, 243, 252, 0.9);
+  background:
+    linear-gradient(145deg, rgba(207, 250, 254, 0.92), transparent 28%),
+    linear-gradient(160deg, #164e63 0 38%, #0891b2 39% 62%, #083344 63% 100%);
+  box-shadow:
+    inset 0 0 4px #67e8f9,
+    0 0 5px #22d3ee,
+    0 0 10px rgba(6, 182, 212, 0.92);
+}
+.stage30OrbitEffect i:nth-child(1) { left: 1px; top: 42%; }
+.stage30OrbitEffect i:nth-child(2) { right: 1px; top: 42%; transform: rotate(180deg); }
+.stage30OrbitEffect i:nth-child(3) { left: 43%; top: 0; transform: rotate(75deg) scale(0.82); }
+.stage30OrbitEffect i:nth-child(4) { left: 43%; bottom: 0; transform: rotate(-105deg) scale(0.82); }
+.stage30OrbitEffect.move-down {
+  background-image: url("../images/boss-stage30-orbit-down.png");
+}
+.stage30OrbitEffect.move-up {
+  background-image: url("../images/boss-stage30-orbit-up.png");
+}
+.stage30OrbitEffect.move-left,
+.stage30OrbitEffect.move-right {
+  background-image: url("../images/boss-stage30-orbit-side.png");
+}
+.stage30OrbitEffect.move-left {
+  animation-direction: reverse;
+}
+@keyframes astrayonStoneOrbit {
+  from { transform: translateY(-36%) scale(1.12) rotate(0deg); }
+  to { transform: translateY(-36%) scale(1.12) rotate(360deg); }
+}
+.stage30TeleportTarget,
+.stage30MagneticField {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+.stage30TeleportTarget {
+  border: 3px dashed rgba(103, 232, 249, 0.95);
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.3), rgba(8, 51, 68, 0.08) 65%, transparent 72%);
+  box-shadow: inset 0 0 18px rgba(34, 211, 238, 0.7), 0 0 12px #0891b2;
+  animation: stage30TargetCharge 1500ms ease-in infinite;
+}
+.stage30MagneticField {
+  border: 2px solid rgba(34, 211, 238, 0.85);
+  background:
+    repeating-radial-gradient(circle, rgba(103, 232, 249, 0.18) 0 4px, transparent 5px 11px),
+    radial-gradient(circle, rgba(8, 145, 178, 0.28), transparent 70%);
+  box-shadow: inset 0 0 20px rgba(6, 182, 212, 0.82), 0 0 14px rgba(34, 211, 238, 0.82);
+  animation: stage30FieldPulse 720ms ease-in-out infinite alternate;
+}
+.monster.stage30Teleporting .stage30OrbitEffect {
+  filter: brightness(2) saturate(1.65) drop-shadow(0 0 7px #cffafe) drop-shadow(0 0 15px #06b6d4);
+  animation-duration: 520ms !important;
+}
+.monster.stage30Weak .monsterSprite {
+  filter: brightness(1.45) drop-shadow(0 0 6px #67e8f9) drop-shadow(0 0 14px #22d3ee);
+  animation: stage30CoreExpose 420ms ease-in-out infinite alternate;
+}
+.stage30StoneBar {
+  position: absolute;
+  z-index: 14;
+  left: 50%;
+  top: calc(100% + 13px - var(--monster-visual-offset, 0px));
+  min-width: 86px;
+  transform: translateX(-50%);
+  padding: 2px 4px;
+  border: 1px solid #67e8f9;
+  border-radius: 999px;
+  background: rgba(8, 47, 73, 0.92);
+  color: #cffafe;
+  font-size: 7px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  text-shadow: 0 0 3px #0891b2;
+}
+@keyframes stage30TargetCharge {
+  0% { opacity: 0.35; transform: translate(-50%, -50%) scale(1.2) rotate(0deg); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(0.82) rotate(180deg); }
+}
+@keyframes stage30FieldPulse {
+  from { opacity: 0.58; transform: translate(-50%, -50%) scale(0.94); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
+}
+@keyframes stage30CoreExpose {
+  from { opacity: 0.78; }
+  to { opacity: 1; }
+}
+
+@keyframes bossStage25FrontBackWalk {
+  0%, 12.49% { background-position: 0 var(--monster-row); }
+  12.5%, 24.99% { background-position: 25% var(--monster-row); }
+  25%, 37.49% { background-position: 50% var(--monster-row); }
+  37.5%, 49.99% { background-position: 75% var(--monster-row); }
+  50%, 62.49% { background-position: 100% var(--monster-row); }
+  62.5%, 74.99% { background-position: 75% var(--monster-row); }
+  75%, 87.49% { background-position: 50% var(--monster-row); }
+  87.5%, 100% { background-position: 25% var(--monster-row); }
+}
+
+@keyframes bossStage25SideWalk {
+  0%, 16.66% { background-position: 0 var(--monster-row); }
+  16.67%, 33.32% { background-position: 25% var(--monster-row); }
+  33.33%, 49.99% { background-position: 50% var(--monster-row); }
+  50%, 66.66% { background-position: 75% var(--monster-row); }
+  66.67%, 83.32% { background-position: 50% var(--monster-row); }
+  83.33%, 100% { background-position: 25% var(--monster-row); }
 }
 .monsterSprite.bossStage15RebirthSprite {
   background-size: 400% 100%;
@@ -765,6 +1131,196 @@ body {
 .monster.finalBoss .monsterSprite {
   filter: drop-shadow(0 0 8px #facc15) drop-shadow(0 0 14px rgba(168, 85, 247, 0.9)) drop-shadow(0 5px 3px rgba(0, 0, 0, 0.75));
 }
+.monster.finalBoss.finalBossPhase1Test {
+  width: 92px;
+  height: 92px;
+}
+.monster.finalBoss.finalBossPhase1Test .monsterSprite {
+  --final-phase1-facing-x: 1;
+  z-index: 2;
+  inset: 5px;
+  width: calc(100% - 10px);
+  height: calc(100% - 10px);
+  background-position: center;
+  background-size: contain;
+  animation: finalBossPhase1Float 1800ms ease-in-out infinite;
+}
+.monster.finalBoss.finalBossPhase1Test .finalBossPhase1Sprite.move-down {
+  background-image: url("../images/final-boss-phase1-front-test.png");
+}
+.monster.finalBoss.finalBossPhase1Test .finalBossPhase1Sprite.move-up {
+  background-image: url("../images/final-boss-phase1-back-test.png");
+}
+.monster.finalBoss.finalBossPhase1Test .finalBossPhase1Sprite.move-right {
+  --final-phase1-facing-x: -1;
+}
+.monster.finalBoss.finalBossPhase2Test {
+  width: 104px;
+  height: 104px;
+}
+.monster.finalBoss.finalBossPhase2Test .monsterSprite {
+  --final-phase2-facing-x: 1;
+  z-index: 2;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  background-image: url("../images/final-boss-phase2-body-test.png");
+  background-position: center;
+  background-size: contain;
+  animation: finalBossPhase2Float 1900ms ease-in-out infinite;
+}
+.monster.finalBoss.finalBossPhase2Test .finalBossPhase2Sprite.move-down {
+  background-image: url("../images/final-boss-phase2-front-test.png");
+  background-size: 112%;
+}
+.monster.finalBoss.finalBossPhase2Test .finalBossPhase2Sprite.move-up {
+  background-image: url("../images/final-boss-phase2-back-test.png");
+}
+.monster.finalBoss.finalBossPhase2Test .finalBossPhase2Sprite.move-left {
+  --final-phase2-facing-x: -1;
+}
+.monster.finalBoss.finalBossPhase2Test .finalBossAuraBack {
+  top: calc(50% - 24px);
+  width: 150%;
+  height: 150%;
+}
+.monster.finalBoss.finalBossPhase3Test {
+  width: 112px;
+  height: 112px;
+}
+.monster.finalBoss.finalBossPhase3Test .monsterSprite {
+  --final-phase3-facing-x: 1;
+  z-index: 2;
+  inset: 3px;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  background-image: url("../images/final-boss-phase3-body-test.png");
+  background-position: center;
+  background-size: contain;
+  animation: finalBossPhase3Float 1700ms ease-in-out infinite;
+}
+.monster.finalBoss.finalBossPhase3Test .finalBossPhase3Sprite.move-down {
+  background-image: url("../images/final-boss-phase3-front-test.png");
+}
+.monster.finalBoss.finalBossPhase3Test .finalBossPhase3Sprite.move-up {
+  background-image: url("../images/final-boss-phase3-back-test.png");
+}
+.monster.finalBoss.finalBossPhase3Test .finalBossPhase3Sprite.move-left {
+  --final-phase3-facing-x: -1;
+}
+.monster.finalBoss.finalBossPhase3Test .finalBossAuraBack {
+  top: calc(50% - 22px);
+  width: 152%;
+  height: 152%;
+}
+.monster.finalBoss.finalBossPhase4Test {
+  width: 96px;
+  height: 96px;
+}
+.monster.finalBoss.finalBossPhase4Test .monsterSprite {
+  z-index: 2;
+  inset: 4px;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  background-image: url("../images/final-boss-phase4-core.png");
+  background-position: center;
+  background-size: 59%;
+  animation: finalBossPhase4Float 2100ms ease-in-out infinite;
+}
+.monster.finalBoss.finalBossPhase4Test .finalBossAuraBack {
+  top: calc(50% - 25px);
+  width: 148%;
+  height: 148%;
+}
+.finalBossAuraBack {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 31px);
+  display: block;
+  pointer-events: none;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.finalBossAuraBack {
+  z-index: 1;
+  width: 142%;
+  height: 142%;
+  opacity: 0.76;
+  background-image: url("../images/final-boss-aura-back-test.png");
+  animation: finalBossAuraOrbit 6200ms linear infinite;
+}
+.finalBossArcSpark {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: calc(50% - 40px);
+  width: 7px;
+  height: 24px;
+  display: block;
+  pointer-events: none;
+  opacity: 0;
+  background: url("../images/final-boss-lightning-sheet.png") 0 0 / 600% 100% no-repeat;
+  filter: brightness(1.32) contrast(1.18) drop-shadow(0 0 3px #fff) drop-shadow(0 0 5px rgba(196, 181, 253, 0.72));
+  transform-origin: center top;
+  animation: finalBossArcSprite 347ms steps(5, end) forwards;
+}
+@keyframes finalBossPhase1Float {
+  0%, 100% {
+    transform: translateY(-35px) scaleX(var(--final-phase1-facing-x));
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 8px rgba(216, 180, 254, 0.72)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.72));
+  }
+  50% {
+    transform: translateY(-31px) scaleX(var(--final-phase1-facing-x));
+    filter: drop-shadow(0 0 7px #fff) drop-shadow(0 0 15px rgba(233, 213, 255, 0.96)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.62)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.72));
+  }
+}
+@keyframes finalBossPhase2Float {
+  0%, 100% {
+    transform: translateY(-29px) scaleX(var(--final-phase2-facing-x));
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 8px rgba(216, 180, 254, 0.72)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.72));
+  }
+  50% {
+    transform: translateY(-25px) scaleX(var(--final-phase2-facing-x));
+    filter: drop-shadow(0 0 7px #fff) drop-shadow(0 0 15px rgba(233, 213, 255, 0.96)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.62)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.72));
+  }
+}
+@keyframes finalBossPhase3Float {
+  0%, 100% {
+    transform: translateY(-27px) scaleX(var(--final-phase3-facing-x));
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 8px rgba(216, 180, 254, 0.72)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.72));
+  }
+  50% {
+    transform: translateY(-22px) scaleX(var(--final-phase3-facing-x));
+    filter: drop-shadow(0 0 7px #fff) drop-shadow(0 0 15px rgba(233, 213, 255, 0.96)) drop-shadow(0 0 24px rgba(168, 85, 247, 0.62)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.72));
+  }
+}
+@keyframes finalBossPhase4Float {
+  0%, 100% {
+    transform: translateY(-29px) scale(0.97);
+    filter: brightness(1.02) drop-shadow(0 0 6px rgba(255, 255, 255, 0.82)) drop-shadow(0 0 12px rgba(216, 180, 254, 0.48)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.72));
+  }
+  50% {
+    transform: translateY(-23px) scale(1.02);
+    filter: brightness(1.18) drop-shadow(0 0 10px #fff) drop-shadow(0 0 20px rgba(233, 213, 255, 0.82)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.72));
+  }
+}
+@keyframes finalBossAuraOrbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes finalBossArcSprite {
+  0% {
+    opacity: 1;
+    background-position: 0 0;
+    transform: translate(-50%, -50%) rotate(var(--arc-r));
+  }
+  100% {
+    opacity: 1;
+    background-position: 100% 0;
+    transform: translate(-50%, -44%) rotate(var(--arc-r));
+  }
+}
 .monster.finalBoss .monsterHp { width: 96px; height: 13px; }
 .finalStageTitle {
   color: #fef08a !important;
@@ -775,6 +1331,262 @@ body {
 .monster.boss .monsterHp {
   width: 64px;
   height: 12px;
+}
+
+.stage20ChargeEffect,
+.stage20ShieldEffect,
+.stage20ShieldHitEffect,
+.stage20ShieldBreakEffect,
+.stage20ShieldIcon,
+.stage20StunEffect {
+  position: absolute;
+  z-index: 10;
+  pointer-events: none;
+}
+.stage20ChargeEffect {
+  inset: -9px;
+  border: 2px solid rgba(216, 180, 254, 0.82);
+  border-radius: 50%;
+  box-shadow:
+    0 0 8px #c084fc,
+    inset 0 0 16px rgba(126, 34, 206, 0.75);
+  animation: stage20Charge 1500ms ease-in forwards;
+}
+.stage20ChargeEffect::before,
+.stage20ChargeEffect::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 2px dashed rgba(233, 213, 255, 0.85);
+  border-radius: 50%;
+  animation: stage20ChargeSpin 700ms linear infinite;
+}
+.stage20ChargeEffect::after {
+  inset: 18px;
+  border-style: solid;
+  animation-direction: reverse;
+}
+.stage20ShieldEffect {
+  z-index: 0;
+  left: 4px;
+  top: 0;
+  width: 64px;
+  height: 72px;
+  clip-path: polygon(
+    50% 0%, 65% 8%, 73% 19%, 91% 27%, 84% 44%, 96% 65%,
+    77% 77%, 69% 96%, 52% 88%, 35% 100%, 27% 80%, 7% 70%,
+    17% 48%, 8% 30%, 29% 20%, 36% 8%
+  );
+  background:
+    radial-gradient(circle at 50% 42%, rgba(216, 180, 254, 0.62), transparent 30%),
+    conic-gradient(
+      from 15deg,
+      rgba(76, 29, 149, 0.2),
+      rgba(147, 51, 234, 0.86),
+      rgba(88, 28, 135, 0.28),
+      rgba(192, 132, 252, 0.9),
+      rgba(76, 29, 149, 0.2)
+    );
+  filter: blur(1.5px) drop-shadow(0 0 5px #7e22ce) drop-shadow(0 0 10px #581c87);
+  mix-blend-mode: screen;
+  transform-origin: center bottom;
+  animation: stage20ShieldAura 760ms ease-in-out infinite;
+}
+.stage20ShieldIcon {
+  z-index: 14;
+  left: 50%;
+  top: -58px;
+  width: 34px;
+  height: 38px;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0 3px #f5d0fe) drop-shadow(0 0 8px #7e22ce);
+  animation: stage20ShieldIconFloat 900ms ease-in-out infinite;
+}
+.stage20ShieldIcon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(50% 0, 96% 13%, 91% 61%, 76% 82%, 50% 100%, 24% 82%, 9% 61%, 4% 13%);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.9), transparent 28%),
+    linear-gradient(160deg, #e9d5ff 0 8%, #a855f7 9% 20%, #581c87 21% 78%, #2e1065 79% 100%);
+  box-shadow:
+    inset 0 0 0 3px #e9d5ff,
+    inset 0 0 0 5px #7e22ce,
+    inset 0 -8px 12px rgba(30, 0, 55, 0.7);
+}
+.stage20ShieldIcon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 14px;
+  height: 17px;
+  transform: translateX(-50%);
+  clip-path: polygon(50% 0, 94% 16%, 84% 65%, 50% 100%, 16% 65%, 6% 16%);
+  background: linear-gradient(160deg, #fff 0 12%, #d8b4fe 13% 42%, #9333ea 43% 100%);
+  box-shadow: 0 0 5px #f5d0fe;
+}
+.stage20ShieldHitEffect {
+  inset: -13px;
+  border: 3px solid rgba(245, 243, 255, 0.95);
+  border-radius: 50%;
+  box-shadow: 0 0 13px 4px #d8b4fe;
+  animation: stage20ShieldDeflect 180ms ease-out 1 forwards;
+}
+.stage20ShieldBreakEffect {
+  inset: -17px;
+  border: 4px dashed #e9d5ff;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 7px #a855f7);
+  animation: stage20ShieldBreak 700ms ease-out 1 forwards;
+}
+.stage20StunEffect {
+  left: 50%;
+  bottom: calc(100% + 8px);
+  width: 48px;
+  height: 18px;
+  transform: translateX(-50%);
+  animation: stage20StunOrbit 900ms linear infinite;
+}
+.stage20StunEffect i {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: #fef08a;
+  clip-path: polygon(50% 0, 61% 35%, 100% 38%, 69% 59%, 80% 100%, 50% 75%, 20% 100%, 31% 59%, 0 38%, 39% 35%);
+  filter: drop-shadow(0 0 3px #facc15);
+}
+.stage20StunEffect i:nth-child(1) { left: 2px; top: 7px; }
+.stage20StunEffect i:nth-child(2) { left: 20px; top: 0; }
+.stage20StunEffect i:nth-child(3) { right: 2px; top: 7px; }
+.stage20ShieldBar {
+  position: absolute;
+  z-index: 13;
+  left: 50%;
+  top: calc(100% - 7px - var(--monster-visual-offset, 0px));
+  width: 64px;
+  height: 8px;
+  transform: translateX(-50%);
+  overflow: hidden;
+  border: 1px solid rgba(233, 213, 255, 0.75);
+  border-radius: 999px;
+  background: rgba(30, 10, 50, 0.9);
+}
+.stage20ShieldBarFill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(90deg, #6d28d9, #c084fc, #f5f3ff);
+  transition: width 80ms ease-out;
+}
+.stage20ShieldBarText {
+  position: relative;
+  z-index: 1;
+  display: block;
+  color: #fff;
+  font-size: 6px;
+  font-weight: 900;
+  line-height: 7px;
+  text-align: center;
+  text-shadow: 0 0 2px #000;
+}
+.monster.stage20Stunned .monsterSprite {
+  filter: grayscale(0.35) brightness(0.75) drop-shadow(0 0 8px rgba(168, 85, 247, 0.8));
+}
+.monster.stage20Shielded .monsterSprite {
+  filter:
+    drop-shadow(0 0 2px #f5d0fe)
+    drop-shadow(0 0 5px #c026d3)
+    drop-shadow(0 0 10px #7e22ce)
+    drop-shadow(0 0 16px rgba(59, 7, 100, 0.95));
+}
+.bossShieldValue { color: #d8b4fe !important; font-weight: 900; }
+
+.stage25ReforgeEffect {
+  position: absolute;
+  z-index: 11;
+  left: 50%;
+  top: calc(15% + 20px);
+  width: 82px;
+  height: 34px;
+  transform: translate(-50%, -6px);
+  pointer-events: none;
+  border: 3px solid rgba(134, 239, 172, 0.9);
+  border-radius: 50%;
+  box-shadow:
+    0 0 8px #4ade80,
+    0 0 20px rgba(22, 163, 74, 0.75),
+    inset 0 0 15px rgba(250, 204, 21, 0.55);
+  animation: stage25ReforgeCharge 2000ms ease-in forwards;
+}
+.stage25ReforgeEffect::before,
+.stage25ReforgeEffect::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 5px;
+  height: 36px;
+  border-radius: 999px;
+  background: linear-gradient(to top, #facc15, #4ade80 62%, transparent);
+  filter: drop-shadow(0 0 4px #86efac);
+  animation: stage25EnergyRise 620ms ease-in infinite;
+}
+.stage25ReforgeEffect::after {
+  left: 28%;
+  height: 27px;
+  animation-delay: -310ms;
+}
+
+@keyframes stage25CellPulse {
+  from { opacity: 0.45; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes stage25ReforgeCharge {
+  0% { opacity: 0.25; transform: translate(-50%, 2px) scale(1.35); }
+  65% { opacity: 0.95; transform: translate(-50%, -8px) scale(0.92); }
+  100% { opacity: 1; transform: translate(-50%, -12px) scale(0.78); }
+}
+@keyframes stage25EnergyRise {
+  0% { opacity: 0; transform: translate(-50%, 16px) scaleY(0.5); }
+  45% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -25px) scaleY(1.2); }
+}
+
+@keyframes stage20Charge {
+  0% { opacity: 0.18; transform: scale(1.35); }
+  65% { opacity: 0.82; transform: scale(0.92); }
+  100% { opacity: 1; transform: scale(0.76); }
+}
+@keyframes stage20ChargeSpin { to { transform: rotate(360deg); } }
+@keyframes stage20ShieldAura {
+  0%, 100% {
+    opacity: 0.66;
+    transform: translateY(-40%) scale(0.96, 1.02) skewX(-1deg);
+  }
+  45% {
+    opacity: 0.98;
+    transform: translateY(-43%) scale(1.07, 1.12) skewX(2deg);
+  }
+  70% {
+    opacity: 0.78;
+    transform: translateY(-39%) scale(1.01, 1.06) skewX(-2deg);
+  }
+}
+@keyframes stage20ShieldIconFloat {
+  0%, 100% { transform: translate(-50%, 0); }
+  50% { transform: translate(-50%, -4px); }
+}
+@keyframes stage20ShieldDeflect {
+  0% { opacity: 1; transform: scale(0.76) rotate(-8deg); }
+  100% { opacity: 0; transform: scale(1.25) rotate(8deg); }
+}
+@keyframes stage20ShieldBreak {
+  0% { opacity: 1; transform: scale(0.8) rotate(0); }
+  100% { opacity: 0; transform: scale(1.65) rotate(35deg); }
+}
+@keyframes stage20StunOrbit {
+  to { transform: translateX(-50%) rotate(360deg); }
 }
 
 .monster.hitFlash {
@@ -1169,6 +1981,39 @@ body {
   box-shadow: 0 0 10px rgba(96, 165, 250, 0.3);
 }
 
+.storageSlot.filled.tier2 {
+  border-color: #38bdf8;
+  background:
+    radial-gradient(circle at 50% 58%, rgba(56, 189, 248, 0.33), transparent 68%),
+    #142b42;
+  box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.2);
+}
+.storageSlot.filled.tier2:hover,
+.storageSlot.filled.tier2:focus-visible {
+  border-color: #7dd3fc;
+  background:
+    radial-gradient(circle at 50% 58%, rgba(56, 189, 248, 0.43), transparent 70%),
+    #173652;
+}
+.storageSlot.filled.tier3 {
+  border-color: #ef4444;
+  background:
+    radial-gradient(circle at 50% 58%, rgba(239, 68, 68, 0.34), transparent 68%),
+    #3a171d;
+  box-shadow: inset 0 0 11px rgba(239, 68, 68, 0.24);
+}
+.storageSlot.filled.tier3:hover,
+.storageSlot.filled.tier3:focus-visible {
+  border-color: #f87171;
+  background:
+    radial-gradient(circle at 50% 58%, rgba(239, 68, 68, 0.45), transparent 70%),
+    #4a1b22;
+}
+.storageSlot.filled.tier2.selected,
+.storageSlot.filled.tier3.selected {
+  outline-color: #f8fafc;
+}
+
 .slotNum {
   position: absolute;
   top: 3px;
@@ -1399,9 +2244,160 @@ body {
   align-items: center;
   justify-content: center;
 }
+.unitTierTwoAura {
+  --unit-tier-color: #ef4444;
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 70%;
+  width: 104%;
+  height: 42%;
+  transform: translate(-50%, -50%);
+  border: 2px solid color-mix(in srgb, var(--unit-tier-color) 78%, white 22%);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at center,
+      color-mix(in srgb, var(--unit-tier-color) 62%, transparent) 0 32%,
+      color-mix(in srgb, var(--unit-tier-color) 92%, transparent) 49%,
+      color-mix(in srgb, var(--unit-tier-color) 22%, transparent) 66%,
+      transparent 74%);
+  box-shadow:
+    0 0 7px var(--unit-tier-color),
+    0 0 12px color-mix(in srgb, var(--unit-tier-color) 72%, transparent),
+    inset 0 0 7px color-mix(in srgb, var(--unit-tier-color) 92%, transparent);
+  pointer-events: none;
+  animation: unitTierTwoCirclePulse var(--unit-tier-duration, 1.45s) ease-in-out infinite alternate;
+}
+.unitTierTwoAura::before,
+.unitTierTwoAura::after {
+  content: "";
+  position: absolute;
+  inset: 16% 8%;
+  border: 1.5px solid color-mix(in srgb, var(--unit-tier-color) 62%, white 38%);
+  border-radius: 50%;
+  opacity: 0.72;
+}
+.unitTierTwoAura::after {
+  inset: 33% 22%;
+  opacity: 0.48;
+}
+.unitTierTwoAura i {
+  position: absolute;
+  left: calc(50% - 1px);
+  bottom: 42%;
+  width: 3px;
+  height: 58%;
+  border-radius: 80% 20% 60% 30%;
+  background: linear-gradient(to top, var(--unit-tier-color), color-mix(in srgb, var(--unit-tier-color) 48%, white 52%), transparent);
+  box-shadow: 0 0 5px var(--unit-tier-color), 0 0 8px var(--unit-tier-color);
+  transform-origin: 50% 100%;
+  animation: unitTierTwoSpikePulse var(--unit-spike-duration, 920ms) ease-in-out infinite alternate;
+  animation-play-state: inherit;
+}
+.unitTierTwoAura i:nth-child(1) { transform: rotate(-82deg) translateY(-15px) scaleY(.72); animation-delay: -120ms; }
+.unitTierTwoAura i:nth-child(2) { transform: rotate(-58deg) translateY(-17px) scaleY(1.15); animation-delay: -530ms; }
+.unitTierTwoAura i:nth-child(3) { transform: rotate(-31deg) translateY(-16px) scaleY(.86); animation-delay: -310ms; }
+.unitTierTwoAura i:nth-child(4) { transform: rotate(-10deg) translateY(-17px) scaleY(1.28); animation-delay: -710ms; }
+.unitTierTwoAura i:nth-child(5) { transform: rotate(12deg) translateY(-16px) scaleY(.78); animation-delay: -220ms; }
+.unitTierTwoAura i:nth-child(6) { transform: rotate(34deg) translateY(-17px) scaleY(1.08); animation-delay: -640ms; }
+.unitTierTwoAura i:nth-child(7) { transform: rotate(59deg) translateY(-16px) scaleY(.9); animation-delay: -390ms; }
+.unitTierTwoAura i:nth-child(8) { transform: rotate(82deg) translateY(-15px) scaleY(1.18); animation-delay: -810ms; }
+.unitTierTwoAura.tierThreeBase {
+  filter: brightness(1.18) saturate(1.2);
+}
+.unitTierThreeOrbit {
+  --unit-orbit-color: #60a5fa;
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 50%;
+  width: 138%;
+  height: 92%;
+  transform: translate(-50%, -50%);
+  border: 1px solid color-mix(in srgb, var(--unit-orbit-color) 38%, transparent);
+  border-radius: 50%;
+  filter: drop-shadow(0 0 2px var(--unit-orbit-color));
+  pointer-events: none;
+  animation: unitTierThreeOrbit var(--unit-orbit-duration, 2.6s) linear infinite;
+}
+.unitTierThreeOrbit::before,
+.unitTierThreeOrbit::after {
+  content: "";
+  position: absolute;
+  inset: 10% 7%;
+  border-radius: 50%;
+  border-top: 1px solid color-mix(in srgb, var(--unit-orbit-color) 64%, white 36%);
+  border-bottom: 1px solid color-mix(in srgb, var(--unit-orbit-color) 58%, transparent);
+}
+.unitTierThreeOrbit::after {
+  inset: 22% 17%;
+  transform: rotate(90deg);
+  opacity: 0.65;
+}
+.unitTierThreeOrbit i {
+  position: absolute;
+  left: calc(50% - 2px);
+  top: calc(50% - 3px);
+  width: 1.5px;
+  height: 18px;
+  border-radius: 90% 10% 75% 25%;
+  background: linear-gradient(to top, transparent, var(--unit-orbit-color) 42%, color-mix(in srgb, var(--unit-orbit-color) 54%, white 46%) 86%, #ffffff);
+  box-shadow: 0 0 2px var(--unit-orbit-color), 0 0 4px color-mix(in srgb, var(--unit-orbit-color) 68%, transparent);
+  transform-origin: .75px 3px;
+  animation: unitTierThreeShardPulse var(--unit-orbit-pulse-duration, 780ms) ease-in-out infinite alternate;
+  animation-play-state: inherit;
+}
+.unitTierThreeOrbit i:nth-child(1) { transform: rotate(0deg) translateY(-24px) scale(.75); animation-delay: -80ms; }
+.unitTierThreeOrbit i:nth-child(2) { transform: rotate(45deg) translateY(-29px) scale(1.05); animation-delay: -430ms; }
+.unitTierThreeOrbit i:nth-child(3) { transform: rotate(90deg) translateY(-31px) scale(.82); animation-delay: -210ms; }
+.unitTierThreeOrbit i:nth-child(4) { transform: rotate(135deg) translateY(-28px) scale(1.12); animation-delay: -610ms; }
+.unitTierThreeOrbit i:nth-child(5) { transform: rotate(180deg) translateY(-24px) scale(.78); animation-delay: -340ms; }
+.unitTierThreeOrbit i:nth-child(6) { transform: rotate(225deg) translateY(-29px) scale(1.02); animation-delay: -720ms; }
+.unitTierThreeOrbit i:nth-child(7) { transform: rotate(270deg) translateY(-31px) scale(.88); animation-delay: -510ms; }
+.unitTierThreeOrbit i:nth-child(8) { transform: rotate(315deg) translateY(-28px) scale(1.08); animation-delay: -160ms; }
+@keyframes unitTierTwoCirclePulse {
+  from { opacity: .84; transform: translate(-50%, -50%) scale(.92); filter: brightness(1); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1.08); filter: brightness(1.55); }
+}
+@keyframes unitTierTwoSpikePulse {
+  0% { height: 30%; opacity: .65; }
+  100% { height: 86%; opacity: 1; }
+}
+@keyframes unitTierThreeOrbit {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+@keyframes unitTierThreeShardPulse {
+  from { opacity: .48; height: 11px; filter: brightness(.9); }
+  to { opacity: .9; height: 21px; filter: brightness(1.35); }
+}
 .unitWrapper.stunned .unit {
   opacity: 0.72;
   filter: grayscale(0.35) brightness(0.78) drop-shadow(0 3px 2px rgba(0, 0, 0, 0.72));
+}
+.unitProtectionBadge {
+  position: absolute;
+  z-index: 13;
+  right: 3px;
+  top: 6px;
+  width: 9px;
+  height: 7px;
+  border: 1px solid #dbeafe;
+  border-radius: 2px;
+  background: #334155;
+  box-shadow: 0 0 3px #000, 0 0 4px rgba(147, 197, 253, 0.72);
+  pointer-events: none;
+}
+.unitProtectionBadge::before {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: -6px;
+  width: 5px;
+  height: 6px;
+  border: 1px solid #dbeafe;
+  border-bottom: 0;
+  border-radius: 5px 5px 0 0;
 }
 .unitStunStars {
   position: absolute;
@@ -1427,15 +2423,6 @@ body {
 @keyframes unitStunOrbit {
   from { transform: translateX(-50%) rotate(0deg); }
   to { transform: translateX(-50%) rotate(360deg); }
-}
-
-.unitTierBadge {
-  position: absolute;
-  top: -10px;
-  right: -8px;
-  font-size: 8px;
-  color: #facc15;
-  text-shadow: 0 0 3px #000;
 }
 
 .combineBtn {
@@ -1708,6 +2695,7 @@ body {
 }
 
 .topHud {
+  position: relative;
   min-height: 104px;
   padding: 0;
   display: grid;
@@ -1732,6 +2720,44 @@ body {
 .stageSummary strong {
   color: #fbbf24;
   font-size: 18px;
+}
+.stageSummary > strong {
+  white-space: nowrap;
+}
+.bossInfoSlot {
+  position: absolute;
+  z-index: 2;
+  left: 230px;
+  top: 0;
+  bottom: 0;
+  width: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-right: 1px solid #3a4352;
+  background: #171a21;
+}
+.bossInfoButton {
+  width: 100%;
+  padding: 3px 9px;
+  border: 1px solid #6b7280;
+  border-radius: 5px;
+  background: #242a35;
+  color: #dbeafe;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.bossInfoButton:hover,
+.bossInfoButton.active {
+  border-color: #a78bfa;
+  background: #3b285e;
+  color: #ffffff;
+  box-shadow: 0 0 7px rgba(167, 139, 250, 0.38);
 }
 
 .resourceSummary {
@@ -2534,6 +3560,13 @@ body {
     width: 110px;
     transform: translateX(-50%);
     border: 0;
+  }
+  .bossInfoSlot {
+    left: calc(100% - 455px);
+    width: 110px;
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
   .topStage strong { font-size: 20px; }
   .waveTimer {

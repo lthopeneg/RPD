@@ -72,14 +72,13 @@ export default function StorageBoard({
           return (
             <div
               key={idx}
-              className={`storageSlot filled ${isSelected ? "selected" : ""} ${activeIndex === idx ? "menuOpen" : ""} ${placementSelectionActive ? "placementSource" : ""}`}
+              className={`storageSlot filled tier${unit.tier} ${isSelected ? "selected" : ""} ${activeIndex === idx ? "menuOpen" : ""} ${placementSelectionActive ? "placementSource" : ""}`}
               role="button"
               tabIndex={0}
               onClick={() => onSelectSlot(idx)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") onSelectSlot(idx);
               }}
-              style={{ borderColor: isSelected ? "#60a5fa" : undefined }}
             >
               <span className="slotNum">{idx + 1}</span>
               <span

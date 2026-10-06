@@ -66,6 +66,7 @@ export interface Unit {
   lastAttackTimeMs?: number;
   facing?: "left" | "right";
   stunnedUntilMs?: number;
+  protected?: boolean;
 }
 
 export interface Monster {
@@ -73,7 +74,14 @@ export interface Monster {
   isBoss: boolean;
   bossStage?: number;
   isFinalBoss?: boolean;
-  finalBossPhase?: 1 | 2 | 3;
+  finalBossPhase?: 1 | 2 | 3 | 4;
+  finalBossTargetPhase?: 1 | 2 | 3 | 4;
+  finalBossMode?: "intro" | "flash" | "absorbing" | "combat" | "releasing";
+  finalBossTransitionEndsAtMs?: number;
+  finalBossFlashNext?: "absorbing" | "combat" | "remove";
+  finalBossEnding?: boolean;
+  finalBossDebugAutoPhase?: boolean;
+  finalBossDebugPhaseEndsAtMs?: number;
   category: MonsterCategory;
   hp: number;
   maxHp: number;
@@ -81,6 +89,7 @@ export interface Monster {
   progress: number;
   speedTilesPerSecond: number;
   laps: number; // 일반 몬스터만 5회 도착 시 게임 오버
+  route?: number[]; // 지형 변경 직후 현재 위치에서 새 전역 경로로 합류하는 임시 경로
   lastHitTime?: number;
   statusImmunityUntilMs?: number; // 1초 상태이상 공통 면역
   slowUntilMs?: number; // 둔화 만료 시각
@@ -103,6 +112,27 @@ export interface Monster {
   stage15PhaseEndsAtMs?: number;
   stage15ReviveAtMs?: number;
   stage15EggMaxHp?: number;
+  stage15ReviveCount?: number;
+  stage20State?: "waiting" | "charging" | "shielded" | "stunned";
+  stage20NextShieldAtMs?: number;
+  stage20CastEndsAtMs?: number;
+  stage20ShieldHp?: number;
+  stage20ShieldMaxHp?: number;
+  stage20StunnedUntilMs?: number;
+  stage20ShieldHitUntilMs?: number;
+  stage20ShieldBreakUntilMs?: number;
+  stage25NextReforgeAtMs?: number;
+  stage25CastEndsAtMs?: number;
+  stage25TargetCells?: number[];
+  stage30StoneCount?: number;
+  stage30StoneHp?: number;
+  stage30StoneMaxHp?: number;
+  stage30WeakUntilMs?: number;
+  stage30NextTeleportAtMs?: number;
+  stage30TeleportEndsAtMs?: number;
+  stage30TeleportTargetStep?: number;
+  stage30MagneticFieldUntilMs?: number;
+  stage30MagneticFieldCell?: number;
 }
 
 export interface Projectile {

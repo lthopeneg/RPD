@@ -1,4 +1,5 @@
 import type { Monster, MonsterCategory } from "../../games/rogueTd/types";
+import { STAGE20_SHIELD_RATIO } from "../../games/rogueTd/constants";
 
 interface Props {
   boss: Monster;
@@ -26,17 +27,30 @@ const STAGE15_EGG_PORTRAIT = new URL(
   "../../images/boss-stage15-egg-portrait.png",
   import.meta.url,
 ).href;
+const STAGE20_PORTRAIT = new URL(
+  "../../images/boss-stage20-fortress-knight-portrait.png",
+  import.meta.url,
+).href;
+const STAGE25_PORTRAIT = new URL(
+  "../../images/boss-stage25-morgaron-portrait.png",
+  import.meta.url,
+).href;
+const STAGE30_PORTRAIT = new URL(
+  "../../images/boss-stage30-astrayon-portrait.png",
+  import.meta.url,
+).href;
+const FINAL_BOSS_CORE_PORTRAIT = new URL(
+  "../../images/final-boss-phase4-core.png",
+  import.meta.url,
+).href;
 
 const BOSS_NAMES: Record<number, string> = {
   5: "황혼의 리치",
   10: "용암갑주 베히모스",
   15: "영겁의 불사조",
-  20: "20스테이지 보스",
-  25: "25스테이지 보스",
-  30: "30스테이지 보스",
-  33: "인간형 최종 보스",
-  34: "육지형 최종 보스",
-  35: "조류형 최종 보스",
+  20: "자색 성채의 기사 바르카인",
+  25: "산맥거북 모르가론",
+  30: "천공요새 아스트라온",
   36: "FINAL BOSS",
 };
 
@@ -48,7 +62,15 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
   const isStage05 = stage === 5;
   const isStage10 = stage === 10;
   const isStage15 = stage === 15;
+  const isStage20 = stage === 20;
+  const isStage25 = stage === 25;
+  const isStage30 = stage === 30;
+  const isFinalBoss = boss.isFinalBoss || stage === 36;
   const stage15State = boss.stage15State ?? "phoenix";
+  const stage20ShieldMaxHp = boss.stage20ShieldMaxHp ?? Math.max(
+    1,
+    Math.round(boss.maxHp * STAGE20_SHIELD_RATIO),
+  );
   const isStage10Stomping =
     boss.stage10StompImpactAtMs !== undefined &&
     gameNowMs < boss.stage10StompImpactAtMs;
@@ -61,7 +83,25 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
     : hpPercent < 50
       ? "bossHpWarning"
       : "bossHpHealthy";
-  const state = isStage15
+  const state = isStage20
+    ? boss.stage20State === "charging"
+      ? (boss.stage20ShieldHp ?? 0) > 0 ? "보호막 재충전 중" : "보호막 생성 중"
+      : boss.stage20State === "shielded"
+        ? "성채 보호막 · 이동속도 80% 감소"
+        : boss.stage20State === "stunned"
+          ? "보호막 파괴 · 기절 · 받는 피해 2배"
+          : "이동 중"
+    : isStage30
+    ? boss.stage30TeleportEndsAtMs !== undefined
+      ? "자력 도약 충전 중"
+      : boss.stage30WeakUntilMs !== undefined
+        ? "동력핵 노출 · 받는 피해 50% 증가"
+        : `궤도 방위체계 · 부유석 ${boss.stage30StoneCount ?? 0}개`
+    : isStage25
+    ? boss.stage25CastEndsAtMs !== undefined
+      ? "대지 에너지 흡수 중"
+      : "이동 중"
+    : isStage15
     ? stage15State === "transforming"
       ? "불타는 알로 변신 중"
       : stage15State === "egg"
@@ -80,7 +120,31 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
         : boss.stage05ShieldActive
           ? "소환 보호막 · 무적"
           : "이동 중";
-  const timerLabel = isStage15
+  const timerLabel = isStage20
+    ? boss.stage20State === "charging" && boss.stage20CastEndsAtMs !== undefined
+      ? `전개까지 ${formatSeconds(boss.stage20CastEndsAtMs - gameNowMs)}`
+      : boss.stage20State === "shielded" && boss.stage20NextShieldAtMs !== undefined
+        ? `재충전까지 ${formatSeconds(boss.stage20NextShieldAtMs - gameNowMs)}`
+        : boss.stage20State === "stunned" && boss.stage20StunnedUntilMs !== undefined
+          ? `기절 해제까지 ${formatSeconds(boss.stage20StunnedUntilMs - gameNowMs)}`
+          : boss.stage20NextShieldAtMs !== undefined
+            ? `다음 보호막까지 ${formatSeconds(boss.stage20NextShieldAtMs - gameNowMs)}`
+            : "발동 대기"
+    : isStage30
+    ? boss.stage30TeleportEndsAtMs !== undefined
+      ? `도약까지 ${formatSeconds(boss.stage30TeleportEndsAtMs - gameNowMs)}`
+      : boss.stage30WeakUntilMs !== undefined
+        ? `부유석 복구까지 ${formatSeconds(boss.stage30WeakUntilMs - gameNowMs)}`
+        : boss.stage30NextTeleportAtMs !== undefined
+          ? `다음 도약까지 ${formatSeconds(boss.stage30NextTeleportAtMs - gameNowMs)}`
+          : "발동 대기"
+    : isStage25
+    ? boss.stage25CastEndsAtMs !== undefined
+      ? `재편까지 ${formatSeconds(boss.stage25CastEndsAtMs - gameNowMs)}`
+      : boss.stage25NextReforgeAtMs !== undefined
+        ? `다음 재편까지 ${formatSeconds(boss.stage25NextReforgeAtMs - gameNowMs)}`
+        : "발동 대기"
+    : isStage15
     ? stage15State === "egg" && boss.stage15ReviveAtMs !== undefined
       ? `부활까지 ${formatSeconds(boss.stage15ReviveAtMs - gameNowMs)}`
       : stage15State === "transforming" && boss.stage15PhaseEndsAtMs !== undefined
@@ -106,7 +170,13 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
 
   return (
     <section className="unitDetailPanel bossDetailPanel panelBox">
-      {isStage05 ? (
+      {isFinalBoss ? (
+        <img
+          className="bossDetailPortrait finalBossCorePortrait"
+          src={FINAL_BOSS_CORE_PORTRAIT}
+          alt="최종 보스의 핵"
+        />
+      ) : isStage05 ? (
         <img
           className="bossDetailPortrait"
           src={STAGE05_PORTRAIT}
@@ -123,6 +193,24 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
           className="bossDetailPortrait"
           src={stage15State === "phoenix" ? STAGE15_PORTRAIT : STAGE15_EGG_PORTRAIT}
           alt={stage15State === "phoenix" ? "영겁의 불사조 전체 모습" : "영겁의 불사조의 알"}
+        />
+      ) : isStage20 ? (
+        <img
+          className="bossDetailPortrait"
+          src={STAGE20_PORTRAIT}
+          alt="20스테이지 보스 전체 모습"
+        />
+      ) : isStage25 ? (
+        <img
+          className="bossDetailPortrait"
+          src={STAGE25_PORTRAIT}
+          alt="산맥거북 모르가론 전체 모습"
+        />
+      ) : isStage30 ? (
+        <img
+          className="bossDetailPortrait"
+          src={STAGE30_PORTRAIT}
+          alt="천공요새 아스트라온 전체 모습"
         />
       ) : (
         <div className="bossDetailPortrait bossPortraitFallback" aria-label="보스 포트레이트">
@@ -143,20 +231,27 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
           <div>
             <dt>형태</dt>
             <dd className="bossCategoryLights">
-              {CATEGORY_LABELS.map((category) => (
-                <span
-                  key={category.id}
-                  className={boss.category === category.id ? "active" : ""}
-                >
-                  {category.label}
-                </span>
-              ))}
+              {boss.isFinalBoss && boss.finalBossPhase === 4
+                ? <span className="active">???</span>
+                : CATEGORY_LABELS.map((category) => (
+                    <span
+                      key={category.id}
+                      className={boss.category === category.id ? "active" : ""}
+                    >
+                      {category.label}
+                    </span>
+                  ))}
             </dd>
           </div>
           <div><dt>이동속도</dt><dd>{boss.speedTilesPerSecond.toFixed(2)}칸/초</dd></div>
           <div><dt>현재 상태</dt><dd className={boss.stage05ShieldActive ? "bossStateActive" : ""}>{state}</dd></div>
-          {(isStage05 || isStage10 || isStage15) && <div><dt>스킬 시간</dt><dd>{timerLabel}</dd></div>}
-          <div><dt>완주 횟수</dt><dd>{boss.laps}회</dd></div>
+          {isStage20 && (
+            <div><dt>보호막</dt><dd className="bossShieldValue">{Math.ceil(boss.stage20ShieldHp ?? 0).toLocaleString()} / {stage20ShieldMaxHp.toLocaleString()}</dd></div>
+          )}
+          {isStage30 && (
+            <div><dt>부유석</dt><dd className="bossShieldValue">{boss.stage30StoneCount ?? 0}/4 · {Math.ceil(boss.stage30StoneHp ?? 0).toLocaleString()} / {(boss.stage30StoneMaxHp ?? 0).toLocaleString()}</dd></div>
+          )}
+          {(isStage05 || isStage10 || isStage15 || isStage20 || isStage25 || isStage30) && <div><dt>스킬 시간</dt><dd>{timerLabel}</dd></div>}
         </dl>
 
         <div className="unitSpecialEffect bossSkillDescription">
@@ -166,13 +261,25 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
               ? "스킬 · 대지 강타"
               : isStage15
                 ? "스킬 · 영겁의 환생"
+                : isStage20
+                  ? "스킬 · 성채의 맹세"
+                  : isStage25
+                    ? "스킬 · 대지의 재편"
+                    : isStage30
+                      ? "스킬 · 궤도 방위체계 / 자력 도약"
               : "스킬"}</strong>
           <p>{isStage05
             ? "등장 8초 후 스켈레톤 5마리를 소환한다. 소환수가 존재하는 동안 무적이 되며, 15초 안에 처치하지 못하면 남은 스켈레톤의 체력을 흡수해 회복한다."
             : isStage10
               ? "이동을 멈추고 주변 3칸에 강력한 충격파를 일으킨다. 범위 안의 유닛은 3초 동안 기절해 공격할 수 없다."
               : isStage15
-                ? "체력이 모두 소진되면 최대 체력의 30%를 지닌 불타는 알로 변한다. 알은 받는 피해가 30% 감소하며, 8초 안에 파괴하지 못하면 최대 체력의 50%로 부활한다."
+                ? "체력이 모두 소진되면 불타는 알로 변한다. 첫 알은 최대 체력의 30%, 두 번째 알부터는 첫 알 체력의 70%로 시작한다. 알은 받는 피해가 30% 감소하며, 15초 안에 파괴하지 못하면 최대 체력의 50%로 부활한다."
+                : isStage20
+                  ? "빛을 모아 최대 체력의 70%인 보호막을 전개한다. 보호막은 피해를 50% 줄이고 이동속도를 80% 낮춘다. 파괴하면 4초간 기절하며 받는 피해가 2배가 되지만, 12초 안에 파괴하지 못하면 보호막을 다시 충전한다."
+                  : isStage25
+                    ? "15초마다 이동을 멈추고 대지의 기운을 흡수한다. 붉게 예고된 5칸 중 빈 칸에는 자연벽을 세우고, 벽이 있는 칸은 종류와 관계없이 파괴해 이동 경로를 바꾼다. 파괴된 벽 위 유닛은 창고로 회수된다."
+                    : isStage30
+                      ? "부유석 4개가 피해 일부를 흡수한다. 모두 파괴하면 5초간 동력핵이 노출되어 받는 피해가 50% 증가한다. 부유석이 남아 있으면 무작위 경로로 자력 도약해 주변 2칸의 유닛을 3초간 기절시킨다."
             : "고유 스킬 정보 준비 중"}</p>
         </div>
       </div>

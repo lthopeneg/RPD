@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { MAX_PLAYER_LEVEL, UNIT_TYPES } from "../../games/rogueTd/constants";
-import type { MonsterCategory, UnitTypeId } from "../../games/rogueTd/types";
+import type { UnitTypeId } from "../../games/rogueTd/types";
 
 export type DebugBrush = "start" | "goal" | "empty" | "natural" | "player" | "permanent";
+export type DebugStagePreset =
+  | "normal-human" | "normal-land" | "normal-flying" | "normal-mixed"
+  | "boss-5" | "boss-10" | "boss-15" | "boss-20" | "boss-25" | "boss-30"
+  | "final-1" | "final-2" | "final-3" | "final-4" | "final-auto";
 
 interface Props {
   brush: DebugBrush | null;
@@ -10,13 +14,9 @@ interface Props {
   onClearMap: () => void;
   onSetGold: (gold: number) => void;
   onSetPlayerLevel: (level: number) => void;
-  onAddUnit: (typeId: UnitTypeId) => void;
-  onSpawnMonsters: (
-    category: MonsterCategory,
-    count: number,
-    bossStage?: number,
-    finalBossPhase?: 1 | 2 | 3,
-  ) => void;
+  onAddUnit: (typeId: UnitTypeId, tier: 1 | 2 | 3) => void;
+  onApplyStage: (preset: DebugStagePreset) => void;
+  onSpawnStage: (count: number) => void;
   onClearMonsters: () => void;
   onSetTimer: (seconds: number) => void;
   onClose: () => void;
@@ -31,27 +31,12 @@ const BRUSHES: { value: DebugBrush; label: string }[] = [
   { value: "permanent", label: "파괴불가" },
 ];
 
-const BOSS_OPTIONS = [
-  { value: "5", label: "5 인간 보스" },
-  { value: "10", label: "10 육지 보스" },
-  { value: "15", label: "15 조류 보스" },
-  { value: "20", label: "20 인간 보스" },
-  { value: "25", label: "25 육지 보스" },
-  { value: "30", label: "30 조류 보스" },
-  { value: "33", label: "33 인간 최종 보스" },
-  { value: "34", label: "34 육지 최종 보스" },
-  { value: "35", label: "35 조류 최종 보스" },
-  { value: "36-1", label: "FINAL 1단계" },
-  { value: "36-2", label: "FINAL 2단계" },
-  { value: "36-3", label: "FINAL 3단계" },
-] as const;
-
 export default function DebugPanel(props: Props) {
   const [gold, setGold] = useState(500);
   const [level, setLevel] = useState(1);
   const [unitType, setUnitType] = useState<UnitTypeId>("swordsman");
-  const [monsterCategory, setMonsterCategory] = useState<MonsterCategory>("human");
-  const [bossSelection, setBossSelection] = useState("normal");
+  const [unitTier, setUnitTier] = useState<1 | 2 | 3>(1);
+  const [stagePreset, setStagePreset] = useState<DebugStagePreset>("normal-human");
   const [monsterCount, setMonsterCount] = useState(1);
   const [timer, setTimer] = useState(40);
 
@@ -84,37 +69,50 @@ export default function DebugPanel(props: Props) {
         <select value={unitType} onChange={(e) => setUnitType(e.target.value as UnitTypeId)}>
           {(Object.keys(UNIT_TYPES) as UnitTypeId[]).map((id) => <option key={id} value={id}>{UNIT_TYPES[id].name}</option>)}
         </select>
-        <button type="button" onClick={() => props.onAddUnit(unitType)}>창고에 추가</button>
+        <select aria-label="유닛 성급" value={unitTier} onChange={(e) => setUnitTier(Number(e.target.value) as 1 | 2 | 3)}>
+          <option value={1}>1성</option>
+          <option value={2}>2성</option>
+          <option value={3}>3성</option>
+        </select>
+        <button type="button" onClick={() => props.onAddUnit(unitType, unitTier)}>창고에 추가</button>
       </section>
 
       <section>
         <div className="debugInline">
-          <select disabled={bossSelection !== "normal"} value={monsterCategory} onChange={(e) => setMonsterCategory(e.target.value as MonsterCategory)}>
-            <option value="human">인간</option><option value="land">육지</option><option value="flying">조류</option>
+          <select value={stagePreset} onChange={(e) => setStagePreset(e.target.value as DebugStagePreset)}>
+            <optgroup label="일반 스테이지">
+              <option value="normal-human">STAGE 1 · 인간형</option>
+              <option value="normal-land">STAGE 2 · 마수형</option>
+              <option value="normal-flying">STAGE 3 · 비행형</option>
+              <option value="normal-mixed">STAGE 4 · 균등 혼합</option>
+            </optgroup>
+            <optgroup label="보스 스테이지">
+              <option value="boss-5">BOSS STAGE 5 · 인간형</option>
+              <option value="boss-10">BOSS STAGE 10 · 마수형</option>
+              <option value="boss-15">BOSS STAGE 15 · 비행형</option>
+              <option value="boss-20">BOSS STAGE 20 · 인간형</option>
+              <option value="boss-25">BOSS STAGE 25 · 마수형</option>
+              <option value="boss-30">BOSS STAGE 30 · 비행형</option>
+            </optgroup>
+            <optgroup label="최종 보스 테스트">
+              <option value="final-1">FINAL · 1페이즈 직접</option>
+              <option value="final-2">FINAL · 2페이즈 직접</option>
+              <option value="final-3">FINAL · 3페이즈 직접</option>
+              <option value="final-4">FINAL · 4페이즈 직접</option>
+              <option value="final-auto">FINAL · 기믹 자동 확인</option>
+            </optgroup>
           </select>
-          <select value={bossSelection} onChange={(e) => setBossSelection(e.target.value)}>
-            <option value="normal">일반 몬스터</option>
-            {BOSS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
+          <button type="button" onClick={() => props.onApplyStage(stagePreset)}>스테이지 적용</button>
+        </div>
+        <div className="debugInline">
+          <span className="debugHint">소환 수</span>
           <input className="debugCount" type="number" min="1" max="100" value={monsterCount} onChange={(e) => setMonsterCount(Number(e.target.value))} />
         </div>
         <button
           type="button"
           className="debugWide"
-          onClick={() => {
-            if (bossSelection === "normal") {
-              props.onSpawnMonsters(monsterCategory, monsterCount);
-              return;
-            }
-            const [stageText, phaseText] = bossSelection.split("-");
-            props.onSpawnMonsters(
-              monsterCategory,
-              monsterCount,
-              Number(stageText),
-              phaseText ? Number(phaseText) as 1 | 2 | 3 : undefined,
-            );
-          }}
-        >몬스터 즉시 소환</button>
+          onClick={() => props.onSpawnStage(monsterCount)}
+        >적용된 스테이지 몬스터 소환</button>
         <button type="button" className="debugWide" onClick={props.onClearMonsters}>소환 몬스터 초기화</button>
       </section>
 

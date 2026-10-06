@@ -1,6 +1,7 @@
 import type {
   MonsterCategory,
   SpecType,
+  UnitClass,
   UnitTypeDef,
   UnitTypeId,
 } from "./types";
@@ -29,6 +30,37 @@ export const NATURAL_DESTROY_COST = 20;
 export const PLAYER_WALL_REFUND_RATE = 0.5;
 export const PLAYER_WALL_LIMIT = 18;
 export const UNIT_RANGE_TILES = 1.5;
+export const UNIT_TIER_DAMAGE_MULTIPLIER: Record<1 | 2 | 3, number> = {
+  1: 1,
+  2: 2,
+  3: 5,
+};
+export const WARRIOR_TIER_ATTACK_SPEED_BONUS: Record<1 | 2 | 3, number> = {
+  1: 0,
+  2: 0.12,
+  3: 0.3,
+};
+export const MAGE_TIER_DAMAGE_BONUS: Record<1 | 2 | 3, number> = {
+  1: 0,
+  2: 0.25,
+  3: 0.75,
+};
+export const RANGER_TIER_RANGE_BONUS: Record<1 | 2 | 3, number> = {
+  1: 0,
+  2: 0.35,
+  3: 0.9,
+};
+const normalizeUnitTier = (tier: number): 1 | 2 | 3 => tier >= 3 ? 3 : tier >= 2 ? 2 : 1;
+export const getUnitTierDamageMultiplier = (tier: number, unitClass: UnitClass) => {
+  const normalizedTier = normalizeUnitTier(tier);
+  return UNIT_TIER_DAMAGE_MULTIPLIER[normalizedTier] + (
+    unitClass === "mage" ? MAGE_TIER_DAMAGE_BONUS[normalizedTier] : 0
+  );
+};
+export const getUnitTierAttackSpeedBonus = (tier: number, unitClass: UnitClass) =>
+  unitClass === "warrior" ? WARRIOR_TIER_ATTACK_SPEED_BONUS[normalizeUnitTier(tier)] : 0;
+export const getUnitTierRangeBonus = (tier: number, unitClass: UnitClass) =>
+  unitClass === "ranger" ? RANGER_TIER_RANGE_BONUS[normalizeUnitTier(tier)] : 0;
 
 export const NATURAL_WALL_COUNT = 10;
 export const PERMANENT_WALL_MIN = 2;
@@ -41,12 +73,18 @@ export const MONSTER_SPAWN_MS = 320;
 export const BOSS_WAVE_INTERVAL = 5;
 export const isFinalStage = (wave: number) => wave === FINAL_STAGE;
 export const isBossWave = (wave: number) =>
-  wave > 0 && (wave % BOSS_WAVE_INTERVAL === 0 || (wave >= 33 && wave <= FINAL_STAGE));
+  wave > 0 && (isFinalStage(wave) || (wave <= 30 && wave % BOSS_WAVE_INTERVAL === 0));
 export const getWaveMonsterCount = (wave: number) =>
   wave === 31
     ? 45
     : wave === 32
       ? 55
+      : wave === 33
+        ? 60
+        : wave === 34
+          ? 65
+          : wave === 35
+            ? 70
       : MONSTERS_PER_WAVE + Math.floor((wave - 1) / 3) * 2;
 
 // 일반 웨이브는 5:3:2 비율로 섞고 주력 유형을 매 스테이지 순환한다.
@@ -76,17 +114,12 @@ export const getWaveComposition = (wave: number): Record<MonsterCategory, number
   return counts;
 };
 export const getBossCategory = (wave: number): MonsterCategory => {
-  if (wave === 33 || isFinalStage(wave)) return "human";
-  if (wave === 34) return "land";
-  if (wave === 35) return "flying";
+  if (isFinalStage(wave)) return "human";
   return MONSTER_ROTATION[(Math.floor(wave / BOSS_WAVE_INTERVAL) - 1) % MONSTER_ROTATION.length];
 };
 export const getBossHp = (wave: number) => {
-  if (wave === 33) return 6500;
-  if (wave === 34) return 7500;
-  if (wave === 35) return 8500;
-  if (isFinalStage(wave)) return 15000;
-  return Math.round(BOSS_HP * 1.75 ** (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1));
+  if (isFinalStage(wave)) return 20000;
+  return Math.round(BOSS_HP * 3 * 1.75 ** (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1));
 };
 // 1차 밸런스: 인간은 기준형, 육지는 느리고 튼튼하며 조류는 빠르고 약하다.
 export const MONSTER_STATS: Record<MonsterCategory, { hp: number; speed: number }> = {
@@ -98,8 +131,19 @@ export const MONSTER_HP_GROWTH_PER_WAVE = 0.16;
 export const getMonsterHp = (category: MonsterCategory, wave: number) =>
   Math.round(
     MONSTER_STATS[category].hp *
+    2.25 *
     (1 + Math.max(0, wave - 1) * MONSTER_HP_GROWTH_PER_WAVE) *
-    (wave === 31 ? 1.35 : wave === 32 ? 1.65 : 1),
+    (wave === 31
+      ? 1.35
+      : wave === 32
+        ? 1.65
+        : wave === 33
+          ? 1.85
+          : wave === 34
+            ? 2.05
+            : wave === 35
+              ? 2.3
+              : 1),
   );
 export const BOSS_HP = 300;
 export const STAGE05_SUMMON_COUNT = 5;
@@ -115,11 +159,37 @@ export const STAGE10_STOMP_COOLDOWN_MS = 12000;
 export const STAGE10_STOMP_STUN_MS = 3000;
 export const STAGE10_STOMP_RADIUS_TILES = 3;
 export const STAGE15_TRANSFORM_MS = 1200;
-export const STAGE15_EGG_HATCH_DELAY_MS = 8000;
+export const STAGE15_EGG_HATCH_DELAY_MS = 15000;
 export const STAGE15_HATCH_MS = 1200;
 export const STAGE15_EGG_HP_RATIO = 0.3;
+// 두 번째 알부터는 첫 알 체력(보스 최대 체력의 30%)의 70%로 시작한다.
+export const STAGE15_REPEAT_EGG_HP_RATIO = STAGE15_EGG_HP_RATIO * 0.7;
 export const STAGE15_EGG_DAMAGE_REDUCTION = 0.3;
 export const STAGE15_REVIVE_HP_RATIO = 0.5;
+export const STAGE20_FIRST_SHIELD_DELAY_MS = 8000;
+export const STAGE20_SHIELD_CAST_MS = 1500;
+export const STAGE20_SHIELD_REFRESH_MS = 12000;
+export const STAGE20_SHIELD_RATIO = 0.7;
+export const STAGE20_SHIELD_DAMAGE_REDUCTION = 0.5;
+export const STAGE20_SHIELDED_SPEED_RATIO = 0.2;
+export const STAGE20_BREAK_STUN_MS = 4000;
+export const STAGE20_BREAK_COOLDOWN_MS = 8000;
+export const STAGE20_BREAK_DAMAGE_MULTIPLIER = 2;
+export const STAGE25_SPEED_RATIO = 0.5;
+export const STAGE25_FIRST_REFORGE_DELAY_MS = 8000;
+export const STAGE25_REFORGE_CAST_MS = 2000;
+export const STAGE25_REFORGE_COOLDOWN_MS = 15000;
+export const STAGE25_REFORGE_TARGET_COUNT = 5;
+export const STAGE30_STONE_COUNT = 4;
+export const STAGE30_STONE_HP_RATIO = 0.08;
+export const STAGE30_WEAK_DURATION_MS = 5000;
+export const STAGE30_WEAK_DAMAGE_MULTIPLIER = 1.5;
+export const STAGE30_FIRST_TELEPORT_DELAY_MS = 6000;
+export const STAGE30_TELEPORT_CAST_MS = 1500;
+export const STAGE30_TELEPORT_COOLDOWN_MS = 12000;
+export const STAGE30_MAGNETIC_FIELD_MS = 4000;
+export const STAGE30_MAGNETIC_RADIUS_TILES = 2;
+export const STAGE30_MAGNETIC_STUN_MS = 3000;
 export const BOSS_SNIPER_DAMAGE_MULTIPLIER = 3; // 즉사 발동 시 보스 대상 테스트 피해 배율
 export const FIRE_BURN_CHANCE = 0.10;
 export const ICE_SLOW_CHANCE = 0.10;
@@ -128,10 +198,15 @@ export const SNIPER_EXECUTE_CHANCE = 0.05;
 
 // 신규 룰 관련 상수
 export const MAX_MONSTER_LAPS = 5; // 5회 완주 시 즉시 게임 오버
-export const WAVE_TIME_LIMIT_SEC = 40; // 웨이브 제한시간 40초
-export const FINAL_WAVE_TIME_LIMIT_SEC = 90;
+export const WAVE_TIME_LIMIT_SEC = 90;
+export const BOSS_WAVE_TIME_LIMIT_SEC = 120;
+export const FINAL_WAVE_TIME_LIMIT_SEC = 360;
 export const getWaveTimeLimit = (wave: number) =>
-  isFinalStage(wave) ? FINAL_WAVE_TIME_LIMIT_SEC : WAVE_TIME_LIMIT_SEC;
+  isFinalStage(wave)
+    ? FINAL_WAVE_TIME_LIMIT_SEC
+    : isBossWave(wave)
+      ? BOSS_WAVE_TIME_LIMIT_SEC
+      : WAVE_TIME_LIMIT_SEC;
 export const SHOP_DRAW_COST = 20;
 export const UPGRADE_DRAW_COST = 30;
 export const MONSTER_KILL_GOLD = 2;
@@ -187,7 +262,7 @@ export const UNIT_TYPES: Record<UnitTypeId, UnitTypeDef> = {
     id: "dual_swordsman",
     name: "쌍검사",
     icon: "🗡️",
-    color: "#38bdf8",
+    color: "#e11d48",
     unitClass: "warrior",
     specType: "land_spec",
     cost: SHOP_DRAW_COST,
@@ -228,7 +303,7 @@ export const UNIT_TYPES: Record<UnitTypeId, UnitTypeDef> = {
     id: "ice_mage",
     name: "얼음술사",
     icon: "❄️",
-    color: "#a78bfa",
+    color: "#38bdf8",
     unitClass: "mage",
     specType: "land_spec",
     cost: SHOP_DRAW_COST,

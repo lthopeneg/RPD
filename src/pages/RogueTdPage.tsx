@@ -12,7 +12,7 @@ import DamageReport from "../components/rogueTd/DamageReport";
 import type { WaveDamageEntry } from "../components/rogueTd/DamageReport";
 import ContextActionMenu from "../components/rogueTd/ContextActionMenu";
 import DebugPanel from "../components/rogueTd/DebugPanel";
-import type { DebugBrush } from "../components/rogueTd/DebugPanel";
+import type { DebugBrush, DebugStagePreset } from "../components/rogueTd/DebugPanel";
 import { generateMap } from "../games/rogueTd/mapGenerator";
 import { findShortestPath, toRC } from "../games/rogueTd/pathfinding";
 import {
@@ -34,6 +34,9 @@ import {
   getBossHp,
   getRequiredXp,
   getUnitDeployLimit,
+  getUnitTierAttackSpeedBonus,
+  getUnitTierDamageMultiplier,
+  getUnitTierRangeBonus,
   getMonsterHp,
   getWaveMonsterCategory,
   getWaveComposition,
@@ -72,9 +75,34 @@ import {
   STAGE15_EGG_DAMAGE_REDUCTION,
   STAGE15_EGG_HATCH_DELAY_MS,
   STAGE15_EGG_HP_RATIO,
+  STAGE15_REPEAT_EGG_HP_RATIO,
   STAGE15_HATCH_MS,
   STAGE15_REVIVE_HP_RATIO,
   STAGE15_TRANSFORM_MS,
+  STAGE20_BREAK_COOLDOWN_MS,
+  STAGE20_BREAK_DAMAGE_MULTIPLIER,
+  STAGE20_BREAK_STUN_MS,
+  STAGE20_FIRST_SHIELD_DELAY_MS,
+  STAGE20_SHIELD_CAST_MS,
+  STAGE20_SHIELD_DAMAGE_REDUCTION,
+  STAGE20_SHIELD_RATIO,
+  STAGE20_SHIELD_REFRESH_MS,
+  STAGE20_SHIELDED_SPEED_RATIO,
+  STAGE25_SPEED_RATIO,
+  STAGE25_FIRST_REFORGE_DELAY_MS,
+  STAGE25_REFORGE_CAST_MS,
+  STAGE25_REFORGE_COOLDOWN_MS,
+  STAGE25_REFORGE_TARGET_COUNT,
+  STAGE30_FIRST_TELEPORT_DELAY_MS,
+  STAGE30_MAGNETIC_FIELD_MS,
+  STAGE30_MAGNETIC_RADIUS_TILES,
+  STAGE30_MAGNETIC_STUN_MS,
+  STAGE30_STONE_COUNT,
+  STAGE30_STONE_HP_RATIO,
+  STAGE30_TELEPORT_CAST_MS,
+  STAGE30_TELEPORT_COOLDOWN_MS,
+  STAGE30_WEAK_DAMAGE_MULTIPLIER,
+  STAGE30_WEAK_DURATION_MS,
   UNIT_SELL_PRICES,
   UNIT_TYPES,
   UPGRADE_DAMAGE_PER_LEVEL,
@@ -116,6 +144,22 @@ const ALL_UNIT_TYPES: UnitTypeId[] = [
 ];
 const DEBUG_ACCESS_CODE = "0427";
 
+const getDebugPresetStage = (preset: DebugStagePreset) => {
+  if (preset === "normal-human") return 1;
+  if (preset === "normal-land") return 2;
+  if (preset === "normal-flying") return 3;
+  if (preset === "normal-mixed") return 4;
+  if (preset.startsWith("boss-")) return Number(preset.slice(5));
+  return 36;
+};
+
+const getDebugPresetCategory = (preset: DebugStagePreset): MonsterCategory | "mixed" => {
+  if (preset === "normal-land") return "land";
+  if (preset === "normal-flying") return "flying";
+  if (preset === "normal-mixed") return "mixed";
+  return "human";
+};
+
 const getRandomUnitType = (): UnitTypeId => {
   const idx = Math.floor(Math.random() * ALL_UNIT_TYPES.length);
   return ALL_UNIT_TYPES[idx];
@@ -139,6 +183,7 @@ export default function RogueTdPage() {
   const [gameSpeed, setGameSpeed] = useState<1 | 2>(1);
   const [debugMode, setDebugMode] = useState(false);
   const [debugBrush, setDebugBrush] = useState<DebugBrush | null>(null);
+  const [debugStagePreset, setDebugStagePreset] = useState<DebugStagePreset>("normal-human");
   const [debugCodePromptOpen, setDebugCodePromptOpen] = useState(false);
   const [debugCodeInput, setDebugCodeInput] = useState("");
   const [debugCodeError, setDebugCodeError] = useState(false);
@@ -149,6 +194,9 @@ export default function RogueTdPage() {
     [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const [monsters, setMonsters] = useState<Monster[]>([]);
   const [selectedBossId, setSelectedBossId] = useState<number | null>(null);
+  const [showStageBossInfo, setShowStageBossInfo] = useState(false);
+  const [bossWarning, setBossWarning] = useState<{ stage: number; token: number } | null>(null);
+  const bossWarningSequence = useRef(0);
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const nextProjectile = useRef(1);
   const [toSpawn, setToSpawn] = useState(0),
@@ -168,6 +216,12 @@ export default function RogueTdPage() {
   const [storageSlots, setStorageSlots] = useState<(StorageUnit | null)[]>(
     Array(20).fill(null),
   );
+  const gridRef = useRef(grid);
+  const pathRef = useRef(path);
+  const storageSlotsRef = useRef(storageSlots);
+  useEffect(() => { gridRef.current = grid; }, [grid]);
+  useEffect(() => { pathRef.current = path; }, [path]);
+  useEffect(() => { storageSlotsRef.current = storageSlots; }, [storageSlots]);
   const [selectedStorageIndex, setSelectedStorageIndex] = useState<
     number | null
   >(null);
@@ -185,10 +239,33 @@ export default function RogueTdPage() {
   const waveDamageRef = useRef<Record<number, number>>({});
   const waveUnitsRef = useRef<Unit[]>([]);
 
+  const triggerBossWarning = (stage: number) => {
+    bossWarningSequence.current += 1;
+    setBossWarning({ stage, token: bossWarningSequence.current });
+  };
+
+  useEffect(() => {
+    if (!bossWarning) return;
+    const timeout = window.setTimeout(() => setBossWarning(null), 2800);
+    return () => window.clearTimeout(timeout);
+  }, [bossWarning]);
+
   const wallCount = grid.filter((c) => c.type === "player").length;
   const unitDeployLimit = getUnitDeployLimit(playerLevel);
   const synergy = useMemo(() => getSynergyState(units), [units]);
-  const waveComposition = useMemo(() => getWaveComposition(wave), [wave]);
+  const waveComposition = useMemo(() => {
+    if (!debugMode) return getWaveComposition(wave);
+    const presetCategory = getDebugPresetCategory(debugStagePreset);
+    if (debugStagePreset.startsWith("normal-")) {
+      if (presetCategory === "mixed") return { human: 1, land: 1, flying: 1 };
+      return {
+        human: presetCategory === "human" ? 1 : 0,
+        land: presetCategory === "land" ? 1 : 0,
+        flying: presetCategory === "flying" ? 1 : 0,
+      };
+    }
+    return getWaveComposition(wave);
+  }, [debugMode, debugStagePreset, wave]);
   const waveCompositionTotal = waveComposition.human + waveComposition.land + waveComposition.flying;
   const wavePercent = (count: number) => waveCompositionTotal > 0
     ? Math.round(count / waveCompositionTotal * 100)
@@ -200,7 +277,10 @@ export default function RogueTdPage() {
   const playerXpPercent = playerLevel < MAX_PLAYER_LEVEL
     ? Math.min(100, playerXp / requiredPlayerXp * 100)
     : 100;
-  const highestMonsterLaps = monsters.reduce((highest, monster) => Math.max(highest, monster.laps), 0);
+  const highestMonsterLaps = monsters.reduce(
+    (highest, monster) => monster.isBoss ? highest : Math.max(highest, monster.laps),
+    0,
+  );
 
   const handleToggleDebug = () => {
     if (debugMode) {
@@ -233,6 +313,35 @@ export default function RogueTdPage() {
   const selectedBoss = selectedBossId !== null
     ? monsters.find((monster) => monster.id === selectedBossId && monster.isBoss) ?? null
     : null;
+  const stageBossPreview = useMemo<Monster | null>(() => {
+    if (!isBossWave(wave)) return null;
+    const isFinalBoss = isFinalStage(wave);
+    const rawHp = getBossHp(wave);
+    const hp = isFinalBoss ? Math.max(1, Math.round(rawHp / 4)) : rawHp;
+    const category = getBossCategory(wave);
+    return {
+      id: -wave,
+      isBoss: true,
+      bossStage: wave,
+      isFinalBoss,
+      finalBossPhase: isFinalBoss ? 4 : undefined,
+      finalBossMode: isFinalBoss ? "combat" : undefined,
+      category,
+      hp,
+      maxHp: hp,
+      pathStep: 0,
+      progress: 0,
+      speedTilesPerSecond: MONSTER_STATS[category].speed * (wave === 25 ? STAGE25_SPEED_RATIO : 1),
+      laps: 0,
+      stage15State: wave === 15 ? "phoenix" : undefined,
+      stage15ReviveCount: wave === 15 ? 0 : undefined,
+      stage20State: wave === 20 ? "waiting" : undefined,
+      stage30StoneCount: wave === 30 ? STAGE30_STONE_COUNT : undefined,
+      stage30StoneMaxHp: wave === 30 ? Math.max(1, Math.round(hp * STAGE30_STONE_HP_RATIO)) : undefined,
+      stage30StoneHp: wave === 30 ? Math.max(1, Math.round(hp * STAGE30_STONE_HP_RATIO)) : undefined,
+    };
+  }, [wave]);
+  const bossDetailTarget = selectedBoss ?? (showStageBossInfo ? stageBossPreview : null);
   const addLog = useCallback((message: string) => {
     setGameLogs((current) => [...current.slice(-99), { id: nextLog.current++, message }]);
   }, []);
@@ -269,6 +378,7 @@ export default function RogueTdPage() {
     setGold(START_GOLD);
     setLife(START_LIFE);
     setWave(1);
+    setBossWarning(null);
     setPlayerLevel(START_PLAYER_LEVEL);
     setPlayerXp(0);
     setUnits([]);
@@ -442,6 +552,7 @@ export default function RogueTdPage() {
         attackIntervalMs: def.attackIntervalMs,
         cooldownMs: 0,
         targetId: null,
+        protected: anchorUnit.protected ?? true,
       });
     } else {
       const emptySlotIdx = newStorageSlots.findIndex((s) => s === null);
@@ -463,6 +574,7 @@ export default function RogueTdPage() {
           attackIntervalMs: def.attackIntervalMs,
           cooldownMs: 0,
           targetId: null,
+          protected: true,
         });
       } else {
         setStatus("⚠️ 승급된 유닛을 보관할 공간이 부족해!");
@@ -491,6 +603,7 @@ export default function RogueTdPage() {
 
   const handleBossClick = (monsterId: number) => {
     setSelectedBossId((current) => current === monsterId ? null : monsterId);
+    setShowStageBossInfo(false);
     setSelectedUnitId(null);
     setSelectedStorageIndex(null);
     setActiveCellIndex(null);
@@ -508,6 +621,15 @@ export default function RogueTdPage() {
     setProjectiles([]);
     monstersRef.current = [];
     projectilesRef.current = [];
+    const restedUnits = unitsRef.current.map((unit) => ({
+      ...unit,
+      cooldownMs: 0,
+      targetId: null,
+      lastAttackTimeMs: undefined,
+      stunnedUntilMs: undefined,
+    }));
+    unitsRef.current = restedUnits;
+    setUnits(restedUnits);
   };
 
   const handleDebugClearMap = () => {
@@ -568,61 +690,95 @@ export default function RogueTdPage() {
     setStatus(`🛠 디버그 맵 도구 적용: ${debugBrush}`);
   };
 
-  const handleDebugAddUnit = (typeId: UnitTypeId) => {
+  const handleDebugAddUnit = (typeId: UnitTypeId, tier: 1 | 2 | 3) => {
     const emptyIndex = storageSlots.findIndex((slot) => slot === null);
     if (emptyIndex < 0) {
       setStatus("⚠️ 창고가 가득 찼습니다.");
       return;
     }
-    const unit = { id: nextUnit.current++, typeId, tier: 1 };
+    const unit = { id: nextUnit.current++, typeId, tier };
     setStorageSlots((slots) => slots.map((slot, index) => index === emptyIndex ? unit : slot));
-    setStatus(`🛠 디버그: ${UNIT_TYPES[typeId].name}을(를) 창고에 추가했습니다.`);
+    setStatus(`🛠 디버그: ${UNIT_TYPES[typeId].name} ${tier}성을 창고에 추가했습니다.`);
+  };
+
+  const handleDebugApplyStage = (preset: DebugStagePreset) => {
+    const stage = getDebugPresetStage(preset);
+    const timeLimit = getWaveTimeLimit(stage);
+    clearDebugCombat();
+    clearInteraction();
+    setDebugStagePreset(preset);
+    setWave(stage);
+    setGameResult("playing");
+    setShowStageBossInfo(false);
+    gameTimeMs.current = 0;
+    waveTimeRemainingMs.current = timeLimit * 1000;
+    setWaveTimeRemainingSec(timeLimit);
+    if (isBossWave(stage)) triggerBossWarning(stage);
+    setStatus(`🛠 디버그: ${stage === 36 ? "FINAL STAGE" : `${stage}스테이지`} 설정을 적용했습니다.`);
   };
 
   const handleDebugSpawnMonsters = (
     category: MonsterCategory,
     requestedCount: number,
     bossStage?: number,
-    requestedFinalPhase?: 1 | 2 | 3,
+    requestedFinalPhase?: 1 | 2 | 3 | 4,
+    requestedFinalAutoPhase = false,
+    mixed = false,
   ) => {
     if (path.length < 2) {
       setStatus("⚠️ 유효한 경로를 먼저 만들어 주세요.");
       return;
     }
-    const count = Math.min(100, Math.max(1, Math.floor(requestedCount || 1)));
+    const count = bossStage === undefined
+      ? Math.min(100, Math.max(1, Math.floor(requestedCount || 1)))
+      : 1;
     const boss = bossStage !== undefined;
     const isFinalBoss = bossStage === 36;
-    const finalBossPhase = isFinalBoss ? requestedFinalPhase ?? 1 : undefined;
-    const spawnCategory = boss
+    const finalBossPhase = isFinalBoss ? requestedFinalAutoPhase ? 4 : requestedFinalPhase ?? 1 : undefined;
+    const fixedSpawnCategory = boss
       ? isFinalBoss
         ? finalBossPhase === 1 ? "human" : finalBossPhase === 2 ? "land" : "flying"
         : getBossCategory(bossStage)
       : category;
-    const maxHp = boss ? getBossHp(bossStage) : getMonsterHp(spawnCategory, wave);
-    const hp = isFinalBoss
-      ? Math.round(maxHp * (finalBossPhase === 1 ? 1 : finalBossPhase === 2 ? 0.6 : 0.3))
-      : maxHp;
-    const created: Monster[] = Array.from({ length: count }, (_, index) => ({
-      id: nextMonster.current++,
-      isBoss: boss,
-      bossStage,
-      isFinalBoss,
-      finalBossPhase,
-      category: spawnCategory,
-      hp,
-      maxHp,
-      pathStep: 0,
-      progress: -index * 0.35,
-      speedTilesPerSecond: MONSTER_STATS[spawnCategory].speed,
-      laps: 0,
-      stage05NextSummonAtMs: bossStage === 5
-        ? gameTimeMs.current + STAGE05_FIRST_SUMMON_DELAY_MS
-        : undefined,
-      stage10NextStompAtMs: bossStage === 10
-        ? gameTimeMs.current + STAGE10_FIRST_STOMP_DELAY_MS
-        : undefined,
-      stage15State: bossStage === 15 ? "phoenix" : undefined,
-    }));
+    const mixedCategories: MonsterCategory[] = ["human", "land", "flying"];
+    const created: Monster[] = Array.from({ length: count }, (_, index) => {
+      const spawnCategory = !boss && mixed ? mixedCategories[index % mixedCategories.length] : fixedSpawnCategory;
+      const maxHp = boss ? getBossHp(bossStage) : getMonsterHp(spawnCategory, wave);
+      const hp = isFinalBoss ? Math.max(1, Math.round(maxHp / 4)) : maxHp;
+      return {
+        id: nextMonster.current++,
+        isBoss: boss,
+        bossStage,
+        isFinalBoss,
+        finalBossPhase,
+        finalBossTargetPhase: isFinalBoss && requestedFinalAutoPhase ? 1 : finalBossPhase,
+        finalBossMode: isFinalBoss ? requestedFinalAutoPhase ? "intro" : "combat" : undefined,
+        finalBossTransitionEndsAtMs: isFinalBoss && requestedFinalAutoPhase
+          ? gameTimeMs.current + 1000
+          : undefined,
+        finalBossDebugAutoPhase: isFinalBoss ? requestedFinalAutoPhase : undefined,
+        category: spawnCategory,
+        hp,
+        maxHp,
+        pathStep: 0,
+        progress: -index * 0.35,
+        speedTilesPerSecond: MONSTER_STATS[spawnCategory].speed * (
+          bossStage === 25 ? STAGE25_SPEED_RATIO : 1
+        ),
+        laps: 0,
+        stage05NextSummonAtMs: bossStage === 5 ? gameTimeMs.current + STAGE05_FIRST_SUMMON_DELAY_MS : undefined,
+        stage10NextStompAtMs: bossStage === 10 ? gameTimeMs.current + STAGE10_FIRST_STOMP_DELAY_MS : undefined,
+        stage15State: bossStage === 15 ? "phoenix" as const : undefined,
+        stage15ReviveCount: bossStage === 15 ? 0 : undefined,
+        stage20State: bossStage === 20 ? "waiting" as const : undefined,
+        stage20NextShieldAtMs: bossStage === 20 ? gameTimeMs.current + STAGE20_FIRST_SHIELD_DELAY_MS : undefined,
+        stage25NextReforgeAtMs: bossStage === 25 ? gameTimeMs.current + STAGE25_FIRST_REFORGE_DELAY_MS : undefined,
+        stage30StoneCount: bossStage === 30 ? STAGE30_STONE_COUNT : undefined,
+        stage30StoneMaxHp: bossStage === 30 ? Math.max(1, Math.round(hp * STAGE30_STONE_HP_RATIO)) : undefined,
+        stage30StoneHp: bossStage === 30 ? Math.max(1, Math.round(hp * STAGE30_STONE_HP_RATIO)) : undefined,
+        stage30NextTeleportAtMs: bossStage === 30 ? gameTimeMs.current + STAGE30_FIRST_TELEPORT_DELAY_MS : undefined,
+      };
+    });
     const nextMonsters = running ? [...monstersRef.current, ...created] : created;
     monstersRef.current = nextMonsters;
     setMonsters([...nextMonsters]);
@@ -643,11 +799,31 @@ export default function RogueTdPage() {
     setRunning(true);
     lastFrame.current = performance.now();
     const monsterLabel = isFinalBoss
-      ? `FINAL BOSS ${finalBossPhase}단계`
+      ? requestedFinalAutoPhase ? "FINAL BOSS 기믹 자동 테스트" : `FINAL BOSS ${finalBossPhase}단계`
       : boss
         ? `${bossStage}스테이지 보스`
-        : `${spawnCategory} 몬스터`;
+        : mixed ? "인간·마수·비행 혼합 몬스터" : `${fixedSpawnCategory} 몬스터`;
     setStatus(`🛠 디버그: ${monsterLabel} ${count}마리를 소환했습니다.`);
+  };
+
+  const handleDebugSpawnStage = (requestedCount: number) => {
+    if (debugStagePreset.startsWith("normal-")) {
+      const category = getDebugPresetCategory(debugStagePreset);
+      handleDebugSpawnMonsters(category === "mixed" ? "human" : category, requestedCount, undefined, undefined, false, category === "mixed");
+      return;
+    }
+    if (debugStagePreset.startsWith("boss-")) {
+      handleDebugSpawnMonsters("human", 1, getDebugPresetStage(debugStagePreset));
+      return;
+    }
+    const phaseText = debugStagePreset.slice(6);
+    handleDebugSpawnMonsters(
+      "human",
+      1,
+      36,
+      phaseText !== "auto" ? Number(phaseText) as 1 | 2 | 3 | 4 : undefined,
+      phaseText === "auto",
+    );
   };
 
   const handleDebugSetTimer = (seconds: number) => {
@@ -675,6 +851,7 @@ export default function RogueTdPage() {
       attackIntervalMs: def.attackIntervalMs,
       cooldownMs: 0,
       targetId: null,
+      protected: true,
     };
   };
 
@@ -701,12 +878,25 @@ export default function RogueTdPage() {
   const sellMapUnit = (unitId: number) => {
     const unit = units.find((item) => item.id === unitId);
     if (!unit) return;
+    if (unit.protected) {
+      setStatus(`🔒 [${UNIT_TYPES[unit.typeId].name}] 보호를 해제한 뒤 판매할 수 있어.`);
+      return;
+    }
     const price = UNIT_SELL_PRICES[unit.tier as 1 | 2 | 3];
     setUnits((current) => current.filter((item) => item.id !== unitId));
     setGold((current) => current + price);
     setStatus(`💰 [${UNIT_TYPES[unit.typeId].name}] 판매 완료! +${price}G`);
     addLog(`${UNIT_TYPES[unit.typeId].name}을(를) 팔아서 ${price}골드를 획득했습니다.`);
     clearInteraction();
+  };
+
+  const toggleMapUnitProtection = (unitId: number) => {
+    const unit = units.find((item) => item.id === unitId);
+    if (!unit) return;
+    const nextProtected = !unit.protected;
+    setUnits((current) => current.map((item) =>
+      item.id === unitId ? { ...item, protected: nextProtected } : item));
+    setStatus(`🔒 [${UNIT_TYPES[unit.typeId].name}] 보호를 ${nextProtected ? "설정" : "해제"}했습니다.`);
   };
 
   const handleSelectStorageSlot = (index: number) => {
@@ -907,6 +1097,7 @@ export default function RogueTdPage() {
       cooldownMs: 0,
       targetId: null,
       lastAttackTimeMs: undefined,
+      stunnedUntilMs: undefined,
     }));
     unitsRef.current = restedUnits;
     setUnits(restedUnits);
@@ -994,9 +1185,14 @@ export default function RogueTdPage() {
       const realDt = Math.min(40, Math.max(0, now - lastFrame.current));
       lastFrame.current = now;
       if (waveTimeRemainingMs.current <= 0) return;
-      const dt = Math.min(realDt * gameSpeed, waveTimeRemainingMs.current);
+      const finalBossTransitionActive = isFinalStage(wave) && monstersRef.current.some(
+        (monster) => monster.isFinalBoss && monster.hp > 0 && monster.finalBossMode !== "combat",
+      );
+      const dt = finalBossTransitionActive
+        ? realDt * gameSpeed
+        : Math.min(realDt * gameSpeed, waveTimeRemainingMs.current);
       gameTimeMs.current += dt;
-      waveTimeRemainingMs.current -= dt;
+      if (!finalBossTransitionActive) waveTimeRemainingMs.current -= dt;
       const gameNow = gameTimeMs.current;
 
       setWaveTimeRemainingSec(Math.ceil(waveTimeRemainingMs.current / 1000));
@@ -1010,8 +1206,9 @@ export default function RogueTdPage() {
         const category = isBoss
           ? getBossCategory(wave)
           : getWaveMonsterCategory(wave, getWaveMonsterCount(wave) - toSpawn);
-        const hp = isBoss ? getBossHp(wave) : getMonsterHp(category, wave);
+        const rawHp = isBoss ? getBossHp(wave) : getMonsterHp(category, wave);
         const isFinalBoss = isFinalStage(wave);
+        const hp = isFinalBoss ? Math.max(1, Math.round(rawHp / 4)) : rawHp;
         const lateWaveSpeedMultiplier = wave === 31 ? 1.08 : wave === 32 ? 1.15 : 1;
 
         monstersRef.current.push({
@@ -1019,13 +1216,18 @@ export default function RogueTdPage() {
           isBoss,
           bossStage: isBoss ? wave : undefined,
           isFinalBoss,
-          finalBossPhase: isFinalBoss ? 1 : undefined,
+          finalBossPhase: isFinalBoss ? 4 : undefined,
+          finalBossTargetPhase: isFinalBoss ? 1 : undefined,
+          finalBossMode: isFinalBoss ? "intro" : undefined,
+          finalBossTransitionEndsAtMs: isFinalBoss ? gameNow + 1000 : undefined,
           category,
           hp,
           maxHp: hp,
           pathStep: 0,
           progress: 0,
-          speedTilesPerSecond: MONSTER_STATS[category].speed * lateWaveSpeedMultiplier,
+          speedTilesPerSecond: MONSTER_STATS[category].speed * lateWaveSpeedMultiplier * (
+            wave === 25 ? STAGE25_SPEED_RATIO : 1
+          ),
           laps: 0,
           stage05NextSummonAtMs: wave === 5
             ? gameNow + STAGE05_FIRST_SUMMON_DELAY_MS
@@ -1034,6 +1236,20 @@ export default function RogueTdPage() {
             ? gameNow + STAGE10_FIRST_STOMP_DELAY_MS
             : undefined,
           stage15State: wave === 15 ? "phoenix" : undefined,
+          stage15ReviveCount: wave === 15 ? 0 : undefined,
+          stage20State: wave === 20 ? "waiting" : undefined,
+          stage20NextShieldAtMs: wave === 20
+            ? gameNow + STAGE20_FIRST_SHIELD_DELAY_MS
+            : undefined,
+          stage25NextReforgeAtMs: wave === 25
+            ? gameNow + STAGE25_FIRST_REFORGE_DELAY_MS
+            : undefined,
+          stage30StoneCount: wave === 30 ? STAGE30_STONE_COUNT : undefined,
+          stage30StoneMaxHp: wave === 30 ? Math.max(1, Math.round(hp * STAGE30_STONE_HP_RATIO)) : undefined,
+          stage30StoneHp: wave === 30 ? Math.max(1, Math.round(hp * STAGE30_STONE_HP_RATIO)) : undefined,
+          stage30NextTeleportAtMs: wave === 30
+            ? gameNow + STAGE30_FIRST_TELEPORT_DELAY_MS
+            : undefined,
         });
       }
 
@@ -1055,13 +1271,14 @@ export default function RogueTdPage() {
             1,
             Math.round(getMonsterHp("human", 5) * STAGE05_SKELETON_HP_RATIO),
           );
+          const bossRoute = boss.route ?? path;
           const bossPathDistance = boss.pathStep + boss.progress;
           const skeletons: Monster[] = Array.from(
             { length: STAGE05_SUMMON_COUNT },
             (_, index) => {
               const spawnDistance = Math.max(0, bossPathDistance - (index + 1) * 0.45);
               const spawnPathStep = Math.min(
-                path.length - 2,
+                bossRoute.length - 2,
                 Math.floor(spawnDistance),
               );
               return {
@@ -1077,6 +1294,7 @@ export default function RogueTdPage() {
                 laps: 0,
                 summonedByBossId: boss.id,
                 noKillGold: true,
+                route: boss.route ? [...boss.route] : undefined,
               };
             },
           );
@@ -1151,10 +1369,11 @@ export default function RogueTdPage() {
           boss.stage10StompImpactAtMs !== undefined &&
           gameNow >= boss.stage10StompImpactAtMs
         ) {
+          const bossRoute = boss.route ?? path;
           const bossPathCell =
-            path[Math.min(boss.pathStep, path.length - 1)] ?? start;
+            bossRoute[Math.min(boss.pathStep, bossRoute.length - 1)] ?? start;
           const nextBossPathCell =
-            path[Math.min(boss.pathStep + 1, path.length - 1)] ?? bossPathCell;
+            bossRoute[Math.min(boss.pathStep + 1, bossRoute.length - 1)] ?? bossPathCell;
           const [bossFromRow, bossFromCol] = toRC(bossPathCell);
           const [bossToRow, bossToCol] = toRC(nextBossPathCell);
           const bossRow = bossFromRow + (bossToRow - bossFromRow) * boss.progress;
@@ -1189,7 +1408,7 @@ export default function RogueTdPage() {
         }
       }
 
-      // 15스테이지 보스: 사망하면 알로 변해 8초 동안 부활을 준비한다.
+      // 15스테이지 보스: 사망하면 알로 변해 15초 동안 부활을 준비한다.
       // 알을 파괴하지 못하면 최대 체력의 50%로 되살아나며 이 과정은 반복된다.
       const stage15Bosses = monstersRef.current.filter(
         (monster) => monster.hp > 0 && monster.isBoss && monster.bossStage === 15,
@@ -1203,7 +1422,7 @@ export default function RogueTdPage() {
           boss.stage15State = "egg";
           boss.stage15PhaseEndsAtMs = undefined;
           boss.stage15ReviveAtMs = gameNow + STAGE15_EGG_HATCH_DELAY_MS;
-          setStatus("🥚 불사조의 알이 부활을 준비합니다. 8초 안에 파괴하세요!");
+          setStatus("🥚 불사조의 알이 부활을 준비합니다. 15초 안에 파괴하세요!");
           addLog("영겁의 불사조가 알로 변했습니다. 부활 전에 파괴해야 합니다.");
         } else if (
           boss.stage15State === "egg" &&
@@ -1220,6 +1439,7 @@ export default function RogueTdPage() {
           gameNow >= boss.stage15PhaseEndsAtMs
         ) {
           boss.stage15State = "phoenix";
+          boss.stage15ReviveCount = (boss.stage15ReviveCount ?? 0) + 1;
           boss.stage15PhaseEndsAtMs = undefined;
           boss.hp = Math.max(1, Math.round(boss.maxHp * STAGE15_REVIVE_HP_RATIO));
           boss.slowUntilMs = undefined;
@@ -1230,24 +1450,320 @@ export default function RogueTdPage() {
         }
       }
 
+      // 20스테이지 보스: 보호막을 주기적으로 충전한다. 제한 시간 안에
+      // 파괴하면 보스가 기절하고, 기절 중에는 두 배의 피해를 받는다.
+      const stage20Bosses = monstersRef.current.filter(
+        (monster) => monster.hp > 0 && monster.isBoss && monster.bossStage === 20,
+      );
+      for (const boss of stage20Bosses) {
+        if (
+          boss.stage20State === "charging" &&
+          boss.stage20CastEndsAtMs !== undefined &&
+          gameNow >= boss.stage20CastEndsAtMs
+        ) {
+          const shieldMaxHp = Math.max(1, Math.round(boss.maxHp * STAGE20_SHIELD_RATIO));
+          boss.stage20State = "shielded";
+          boss.stage20CastEndsAtMs = undefined;
+          boss.stage20ShieldMaxHp = shieldMaxHp;
+          boss.stage20ShieldHp = shieldMaxHp;
+          boss.stage20NextShieldAtMs = gameNow + STAGE20_SHIELD_REFRESH_MS;
+          setStatus("🛡️ 성채기사가 최대 체력의 70%에 해당하는 보호막을 펼쳤습니다!");
+          addLog("20스테이지 보스가 보라색 성채 보호막을 전개했습니다.");
+        } else if (
+          boss.stage20State === "stunned" &&
+          boss.stage20StunnedUntilMs !== undefined &&
+          gameNow >= boss.stage20StunnedUntilMs
+        ) {
+          boss.stage20State = "waiting";
+          boss.stage20StunnedUntilMs = undefined;
+          boss.stage20NextShieldAtMs = gameNow + STAGE20_BREAK_COOLDOWN_MS;
+          setStatus("⚔️ 성채기사가 기절에서 회복했습니다.");
+        } else if (
+          boss.stage20State !== "charging" &&
+          boss.stage20State !== "stunned" &&
+          boss.stage20NextShieldAtMs !== undefined &&
+          gameNow >= boss.stage20NextShieldAtMs
+        ) {
+          boss.stage20State = "charging";
+          boss.stage20CastEndsAtMs = gameNow + STAGE20_SHIELD_CAST_MS;
+          boss.stage20NextShieldAtMs = undefined;
+          setStatus("🔮 성채기사가 이동을 멈추고 보호막을 충전합니다!");
+        }
+      }
+
+      // 25스테이지 보스: 현재 길을 포함한 지형 5칸을 예고한 뒤 뒤집는다.
+      // 빈 칸은 자연벽이 되고 모든 종류의 벽은 제거된다. 새 벽은 전체 경로가
+      // 유지되는 경우에만 확정하며, 이동 중인 몬스터의 현재 구간은 보존한다.
+      const stage25Bosses = monstersRef.current.filter(
+        (monster) => monster.hp > 0 && monster.isBoss && monster.bossStage === 25,
+      );
+      for (const boss of stage25Bosses) {
+        if (
+          boss.stage25CastEndsAtMs !== undefined &&
+          gameNow >= boss.stage25CastEndsAtMs
+        ) {
+          const nextGrid = gridRef.current.map((cell) => ({ ...cell }));
+          const targets = boss.stage25TargetCells ?? [];
+          const returnedUnitIds = new Set<number>();
+          const nextStorage = [...storageSlotsRef.current];
+          let createdWalls = 0;
+          let destroyedWalls = 0;
+
+          for (const cellIndex of targets) {
+            if (cellIndex === start || cellIndex === goal) continue;
+            const cell = nextGrid[cellIndex];
+            if (!cell) continue;
+
+            if (cell.type === "empty") {
+              const previous = nextGrid[cellIndex];
+              nextGrid[cellIndex] = { type: "natural" };
+              if (findShortestPath(nextGrid, start, goal)) {
+                createdWalls += 1;
+              } else {
+                nextGrid[cellIndex] = previous;
+              }
+            } else {
+              const unit = unitsRef.current.find((candidate) => candidate.cell === cellIndex);
+              if (unit) {
+                const emptySlot = nextStorage.findIndex((slot) => slot === null);
+                if (emptySlot < 0) continue;
+                nextStorage[emptySlot] = mapToStorageUnit(unit);
+                returnedUnitIds.add(unit.id);
+              }
+              nextGrid[cellIndex] = { type: "empty" };
+              destroyedWalls += 1;
+            }
+          }
+
+          if (returnedUnitIds.size > 0) {
+            unitsRef.current = unitsRef.current.filter((unit) => !returnedUnitIds.has(unit.id));
+            storageSlotsRef.current = nextStorage;
+            setUnits([...unitsRef.current]);
+            setStorageSlots(nextStorage);
+          }
+
+          const oldGlobalPath = pathRef.current;
+          const nextGlobalPath = findShortestPath(nextGrid, start, goal);
+          if (nextGlobalPath) {
+            for (const monster of monstersRef.current) {
+              const oldRoute = monster.route ?? oldGlobalPath;
+              const from = oldRoute[Math.min(monster.pathStep, oldRoute.length - 1)] ?? start;
+              const to = oldRoute[Math.min(monster.pathStep + 1, oldRoute.length - 1)] ?? from;
+              const tail = findShortestPath(nextGrid, to, goal);
+              if (tail) {
+                monster.route = from === to ? tail : [from, ...tail];
+                monster.pathStep = 0;
+              }
+            }
+            gridRef.current = nextGrid;
+            pathRef.current = nextGlobalPath;
+            setGrid(nextGrid);
+            setPath(nextGlobalPath);
+          }
+
+          boss.stage25CastEndsAtMs = undefined;
+          boss.stage25TargetCells = undefined;
+          boss.stage25NextReforgeAtMs = gameNow + STAGE25_REFORGE_COOLDOWN_MS;
+          const returnText = returnedUnitIds.size > 0
+            ? ` 유닛 ${returnedUnitIds.size}기는 창고로 회수되었습니다.`
+            : "";
+          setStatus(`🌿 모르가론이 자연벽 ${createdWalls}개를 생성하고 벽 ${destroyedWalls}개를 파괴했습니다.${returnText}`);
+          addLog(`산맥거북 모르가론이 대지를 재편했습니다. 자연벽 ${createdWalls}개 생성, 벽 ${destroyedWalls}개 파괴.${returnText}`);
+        } else if (
+          boss.stage25CastEndsAtMs === undefined &&
+          boss.stage25NextReforgeAtMs !== undefined &&
+          gameNow >= boss.stage25NextReforgeAtMs
+        ) {
+          const protectedCells = new Set<number>();
+          for (const monster of monstersRef.current) {
+            const monsterRoute = monster.route ?? pathRef.current;
+            protectedCells.add(monsterRoute[Math.min(monster.pathStep, monsterRoute.length - 1)] ?? start);
+            protectedCells.add(monsterRoute[Math.min(monster.pathStep + 1, monsterRoute.length - 1)] ?? start);
+          }
+
+          const freeStorageCount = storageSlotsRef.current.filter((slot) => slot === null).length;
+          let reservedStorageCount = 0;
+          const tentativeGrid = gridRef.current.map((cell) => ({ ...cell }));
+          const candidates = Array.from({ length: CELL_COUNT }, (_, index) => index)
+            .filter((index) => index !== start && index !== goal)
+            .sort(() => Math.random() - 0.5);
+          const targets: number[] = [];
+
+          for (const cellIndex of candidates) {
+            if (targets.length >= STAGE25_REFORGE_TARGET_COUNT) break;
+            const cell = tentativeGrid[cellIndex];
+            if (!cell) continue;
+
+            if (cell.type === "empty") {
+              if (protectedCells.has(cellIndex)) continue;
+              tentativeGrid[cellIndex] = { type: "natural" };
+              if (findShortestPath(tentativeGrid, start, goal)) {
+                targets.push(cellIndex);
+              } else {
+                tentativeGrid[cellIndex] = { type: "empty" };
+              }
+            } else {
+              const hasUnit = unitsRef.current.some((unit) => unit.cell === cellIndex);
+              if (hasUnit && reservedStorageCount >= freeStorageCount) continue;
+              if (hasUnit) reservedStorageCount += 1;
+              tentativeGrid[cellIndex] = { type: "empty" };
+              targets.push(cellIndex);
+            }
+          }
+
+          if (targets.length > 0) {
+            boss.stage25TargetCells = targets;
+            boss.stage25CastEndsAtMs = gameNow + STAGE25_REFORGE_CAST_MS;
+            boss.stage25NextReforgeAtMs = undefined;
+            setStatus(`⚠️ 모르가론이 대지의 기운을 모읍니다. 붉게 빛나는 ${targets.length}칸이 곧 바뀝니다!`);
+            addLog(`산맥거북 모르가론이 대지 재편을 준비합니다. 대상 ${targets.length}칸.`);
+          } else {
+            boss.stage25NextReforgeAtMs = gameNow + STAGE25_REFORGE_COOLDOWN_MS;
+          }
+        }
+      }
+
+      // 30스테이지 보스: 부유석이 방어력을 제공하며, 남은 부유석을 이용해
+      // 경로의 무작위 지점으로 도약한 뒤 주변 유닛을 기절시킨다.
+      const stage30Bosses = monstersRef.current.filter(
+        (monster) => monster.hp > 0 && monster.isBoss && monster.bossStage === 30,
+      );
+      for (const boss of stage30Bosses) {
+        if (
+          boss.stage30MagneticFieldUntilMs !== undefined &&
+          gameNow >= boss.stage30MagneticFieldUntilMs
+        ) {
+          boss.stage30MagneticFieldUntilMs = undefined;
+          boss.stage30MagneticFieldCell = undefined;
+        }
+        if (boss.stage30WeakUntilMs !== undefined && gameNow >= boss.stage30WeakUntilMs) {
+          boss.stage30WeakUntilMs = undefined;
+          boss.stage30StoneCount = STAGE30_STONE_COUNT;
+          boss.stage30StoneHp = boss.stage30StoneMaxHp;
+          boss.stage30NextTeleportAtMs = gameNow + STAGE30_FIRST_TELEPORT_DELAY_MS;
+          setStatus("💠 아스트라온의 궤도 부유석이 재생성되었습니다!");
+          addLog("천공요새 아스트라온이 궤도 방위체계를 복구했습니다.");
+        }
+
+        if (
+          boss.stage30TeleportEndsAtMs !== undefined &&
+          gameNow >= boss.stage30TeleportEndsAtMs
+        ) {
+          const bossRoute = boss.route ?? path;
+          const targetStep = Math.min(
+            bossRoute.length - 2,
+            Math.max(1, boss.stage30TeleportTargetStep ?? 1),
+          );
+          boss.pathStep = targetStep;
+          boss.progress = 0;
+          boss.stage30TeleportEndsAtMs = undefined;
+          boss.stage30TeleportTargetStep = undefined;
+          boss.stage30MagneticFieldUntilMs = gameNow + STAGE30_MAGNETIC_FIELD_MS;
+          boss.stage30NextTeleportAtMs = gameNow + STAGE30_TELEPORT_COOLDOWN_MS;
+          const targetCell = bossRoute[targetStep] ?? start;
+          boss.stage30MagneticFieldCell = targetCell;
+          const [targetRow, targetCol] = toRC(targetCell);
+          let stunnedCount = 0;
+          for (const unit of unitsRef.current) {
+            const [unitRow, unitCol] = toRC(unit.cell);
+            if (Math.hypot(unitRow - targetRow, unitCol - targetCol) <= STAGE30_MAGNETIC_RADIUS_TILES) {
+              unit.stunnedUntilMs = Math.max(
+                unit.stunnedUntilMs ?? 0,
+                gameNow + STAGE30_MAGNETIC_STUN_MS,
+              );
+              stunnedCount += 1;
+            }
+          }
+          setUnits([...unitsRef.current]);
+          setStatus(`🧲 자력 도약! 자기장에 닿은 유닛 ${stunnedCount}기가 3초간 기절했습니다.`);
+          addLog(`아스트라온이 무작위 경로로 순간이동해 유닛 ${stunnedCount}기를 기절시켰습니다.`);
+        } else if (
+          (boss.stage30StoneCount ?? 0) > 0 &&
+          boss.stage30WeakUntilMs === undefined &&
+          boss.stage30TeleportEndsAtMs === undefined &&
+          boss.stage30NextTeleportAtMs !== undefined &&
+          gameNow >= boss.stage30NextTeleportAtMs
+        ) {
+          const bossRoute = boss.route ?? path;
+          if (bossRoute.length > 2) {
+            boss.stage30TeleportTargetStep = 1 + Math.floor(Math.random() * (bossRoute.length - 2));
+            boss.stage30TeleportEndsAtMs = gameNow + STAGE30_TELEPORT_CAST_MS;
+            boss.stage30NextTeleportAtMs = undefined;
+            setStatus("⚡ 아스트라온의 부유석이 빛나며 자력 도약을 준비합니다!");
+          }
+        }
+      }
+
       // 2. 몬스터 이동 & 완주(laps) 순환 이동 처리
       let instantGameOver = false;
 
       for (const m of monstersRef.current) {
-        if (m.isFinalBoss) {
-          const hpRatio = m.hp / m.maxHp;
-          const nextPhase: 1 | 2 | 3 = hpRatio > 2 / 3 ? 1 : hpRatio > 1 / 3 ? 2 : 3;
-          if (nextPhase !== m.finalBossPhase) {
-            m.finalBossPhase = nextPhase;
-            m.category = nextPhase === 1 ? "human" : nextPhase === 2 ? "land" : "flying";
-            m.speedTilesPerSecond = MONSTER_STATS[m.category].speed;
-            m.slowUntilMs = undefined;
-            m.paralyzeUntilMs = undefined;
-            m.statusImmunityUntilMs = gameNow + 800;
-            const phaseName = nextPhase === 2 ? "육지형" : "조류형";
-            setStatus(`👑 최종 보스가 ${phaseName} 형태로 변환했습니다!`);
-            addLog(`FINAL BOSS가 ${phaseName} 형태로 변환했습니다.`);
+        if (
+          m.isFinalBoss &&
+          m.finalBossDebugAutoPhase &&
+          m.finalBossMode === "combat" &&
+          m.finalBossDebugPhaseEndsAtMs !== undefined &&
+          gameNow >= m.finalBossDebugPhaseEndsAtMs
+        ) {
+          const completedPhase = m.finalBossPhase ?? 4;
+          m.finalBossTargetPhase = completedPhase === 4
+            ? 1
+            : (completedPhase + 1) as 2 | 3 | 4;
+          m.finalBossMode = "releasing";
+          m.finalBossTransitionEndsAtMs = gameNow + 1867;
+          m.finalBossDebugPhaseEndsAtMs = undefined;
+          m.hp = m.maxHp;
+          m.slowUntilMs = undefined;
+          m.paralyzeUntilMs = undefined;
+          setStatus(`🛠 FINAL ${completedPhase}페이즈 5초 테스트 종료 · 다음 페이즈 전환`);
+        }
+        if (m.isFinalBoss && m.finalBossMode !== "combat") {
+          if (m.finalBossTransitionEndsAtMs !== undefined && gameNow >= m.finalBossTransitionEndsAtMs) {
+            if (m.finalBossMode === "intro") {
+              m.finalBossMode = "absorbing";
+              m.finalBossTransitionEndsAtMs = gameNow + 1867;
+              setStatus("⚪ 맵의 빛이 최종 보스의 핵으로 빨려 들어갑니다!");
+            } else if (m.finalBossMode === "releasing") {
+              m.finalBossMode = "flash";
+              m.finalBossFlashNext = m.finalBossEnding ? "remove" : "absorbing";
+              m.finalBossTransitionEndsAtMs = gameNow + 420;
+              setStatus("⚪ 빛의 방출이 끝나며 최종 보스의 형태가 무너집니다!");
+            } else if (m.finalBossMode === "flash") {
+              if (m.finalBossFlashNext === "remove") {
+                m.hp = 0;
+                m.finalBossTransitionEndsAtMs = undefined;
+                setStatus("👑 최종 보스의 핵이 소멸했습니다!");
+              } else if (m.finalBossFlashNext === "combat") {
+                const nextPhase = m.finalBossTargetPhase ?? 1;
+                m.finalBossPhase = nextPhase;
+                m.finalBossMode = "combat";
+                m.finalBossTransitionEndsAtMs = undefined;
+                m.finalBossFlashNext = undefined;
+                m.category = nextPhase === 1 ? "human" : nextPhase === 2 ? "land" : "flying";
+                m.speedTilesPerSecond = MONSTER_STATS[m.category].speed;
+                m.hp = m.maxHp;
+                m.finalBossDebugPhaseEndsAtMs = m.finalBossDebugAutoPhase
+                  ? gameNow + 5000
+                  : undefined;
+                m.statusImmunityUntilMs = gameNow + 800;
+                const phaseName = nextPhase === 1 ? "인간형" : nextPhase === 2 ? "육지형" : nextPhase === 3 ? "조류형" : "???";
+                setStatus(`👑 최종 보스 ${nextPhase}페이즈 · ${phaseName} 전투가 시작됩니다!`);
+                addLog(`FINAL BOSS ${nextPhase}페이즈가 시작되었습니다.`);
+              } else {
+                m.finalBossPhase = 4;
+                m.finalBossMode = "absorbing";
+                m.finalBossFlashNext = undefined;
+                m.finalBossTransitionEndsAtMs = gameNow + 1867;
+                setStatus("⚪ 최종 보스가 핵으로 변환되어 다시 빛을 흡수합니다!");
+              }
+            } else if (m.finalBossMode === "absorbing") {
+              m.finalBossMode = "flash";
+              m.finalBossFlashNext = "combat";
+              m.finalBossTransitionEndsAtMs = gameNow + 420;
+              setStatus("⚪ 흡수된 빛이 폭발하며 최종 보스의 형태가 바뀝니다!");
+            }
           }
+          continue;
         }
         // 둔화/마비 속도 적용
         let currentSpeed = m.speedTilesPerSecond;
@@ -1262,22 +1778,31 @@ export default function RogueTdPage() {
             gameNow < m.stage10StompImpactAtMs
           )
           || (m.bossStage === 15 && (m.stage15State ?? "phoenix") !== "phoenix")
+          || (m.bossStage === 20 && (
+            m.stage20State === "charging" || m.stage20State === "stunned"
+          ))
+          || (m.bossStage === 25 && m.stage25CastEndsAtMs !== undefined && gameNow < m.stage25CastEndsAtMs)
+          || (m.bossStage === 30 && m.stage30TeleportEndsAtMs !== undefined && gameNow < m.stage30TeleportEndsAtMs)
         ) {
           currentSpeed = 0;
+        } else if (m.bossStage === 20 && m.stage20State === "shielded") {
+          currentSpeed *= STAGE20_SHIELDED_SPEED_RATIO;
         } else if (m.paralyzeUntilMs && gameNow < m.paralyzeUntilMs) {
           currentSpeed = 0; // 마비: 0% 속도
         } else if (m.slowUntilMs && gameNow < m.slowUntilMs) {
           currentSpeed *= 0.5; // 둔화: 50% 속도
         }
 
+        const monsterRoute = m.route ?? path;
         m.progress += currentSpeed * (dt / 1000);
         while (m.progress >= 1) {
           m.progress -= 1;
           m.pathStep++;
 
           // 도착 지점(G) 도착 시 -> 몬스터 삭제 안 하고 laps + 1 후 S로 재입장!
-          if (m.pathStep >= path.length - 1) {
+          if (m.pathStep >= monsterRoute.length - 1) {
             m.laps += 1;
+            m.route = undefined;
             m.pathStep = 0;
             m.progress = 0;
 
@@ -1311,8 +1836,9 @@ export default function RogueTdPage() {
       let killGold = 0;
 
       const getMonsterPos = (m: Monster) => {
-        const a = path[Math.min(m.pathStep, path.length - 1)] ?? start;
-        const b = path[Math.min(m.pathStep + 1, path.length - 1)] ?? a;
+        const monsterRoute = m.route ?? path;
+        const a = monsterRoute[Math.min(m.pathStep, monsterRoute.length - 1)] ?? start;
+        const b = monsterRoute[Math.min(m.pathStep + 1, monsterRoute.length - 1)] ?? a;
         const [ar, ac] = toRC(a);
         const [br, bc] = toRC(b);
         return [ar + (br - ar) * m.progress, ac + (bc - ac) * m.progress];
@@ -1343,21 +1869,109 @@ export default function RogueTdPage() {
         if (
           m.hp <= 0 ||
           damage <= 0 ||
+          (m.isFinalBoss && m.finalBossMode !== "combat") ||
           m.stage05ShieldActive ||
           m.stage05BeingAbsorbed ||
           (m.bossStage === 15 && (stage15State === "transforming" || stage15State === "hatching"))
         ) return 0;
+        if (
+          m.bossStage === 20 &&
+          (m.stage20ShieldHp ?? 0) > 0 &&
+          (m.stage20State === "shielded" || m.stage20State === "charging")
+        ) {
+          const shieldDamage = Math.max(
+            1,
+            Math.round(damage * (1 - STAGE20_SHIELD_DAMAGE_REDUCTION)),
+          );
+          const actualShieldDamage = Math.min(m.stage20ShieldHp ?? 0, shieldDamage);
+          m.stage20ShieldHp = Math.max(0, (m.stage20ShieldHp ?? 0) - actualShieldDamage);
+          m.stage20ShieldHitUntilMs = gameNow + 180;
+          waveDamageRef.current[sourceUnitId] =
+            (waveDamageRef.current[sourceUnitId] ?? 0) + actualShieldDamage;
+          m.lastHitTime = gameNow;
+
+          if (m.stage20ShieldHp <= 0) {
+            m.stage20State = "stunned";
+            m.stage20ShieldHp = 0;
+            m.stage20CastEndsAtMs = undefined;
+            m.stage20NextShieldAtMs = undefined;
+            m.stage20StunnedUntilMs = gameNow + STAGE20_BREAK_STUN_MS;
+            m.stage20ShieldBreakUntilMs = gameNow + 700;
+            m.slowUntilMs = undefined;
+            m.paralyzeUntilMs = undefined;
+            setStatus("💥 보호막 파괴! 성채기사가 4초간 기절하고 받는 피해가 두 배가 됩니다!");
+            addLog("20스테이지 보스의 보호막을 파괴했습니다. 약점 노출 시간이 시작됩니다.");
+          }
+          return actualShieldDamage;
+        }
+        if (m.bossStage === 30 && (m.stage30StoneCount ?? 0) > 0) {
+          const stoneCount = Math.min(STAGE30_STONE_COUNT, m.stage30StoneCount ?? 0);
+          const reductionByCount = [0, 0.15, 0.3, 0.4, 0.5];
+          const reduction = reductionByCount[stoneCount] ?? 0;
+          const stoneDamage = Math.max(1, Math.round(damage * reduction));
+          const actualStoneDamage = Math.min(m.stage30StoneHp ?? 0, stoneDamage);
+          m.stage30StoneHp = Math.max(0, (m.stage30StoneHp ?? 0) - actualStoneDamage);
+          waveDamageRef.current[sourceUnitId] =
+            (waveDamageRef.current[sourceUnitId] ?? 0) + actualStoneDamage;
+          damage = Math.max(1, damage - stoneDamage);
+          m.lastHitTime = gameNow;
+
+          if ((m.stage30StoneHp ?? 0) <= 0) {
+            m.stage30StoneCount = Math.max(0, stoneCount - 1);
+            if ((m.stage30StoneCount ?? 0) > 0) {
+              m.stage30StoneHp = m.stage30StoneMaxHp;
+              setStatus(`💥 궤도 부유석 파괴! 남은 부유석 ${m.stage30StoneCount}개`);
+            } else {
+              m.stage30StoneHp = 0;
+              m.stage30WeakUntilMs = gameNow + STAGE30_WEAK_DURATION_MS;
+              m.stage30NextTeleportAtMs = undefined;
+              m.stage30TeleportEndsAtMs = undefined;
+              m.stage30TeleportTargetStep = undefined;
+              setStatus("💎 모든 부유석 파괴! 아스트라온의 동력핵이 5초간 노출됩니다!");
+              addLog("아스트라온의 궤도 방위체계를 파괴해 동력핵 약점이 노출되었습니다.");
+            }
+          }
+        }
         const reducedDamage = m.bossStage === 15 && stage15State === "egg"
           ? Math.max(1, Math.round(damage * (1 - STAGE15_EGG_DAMAGE_REDUCTION)))
-          : damage;
+          : m.bossStage === 20 && m.stage20State === "stunned"
+            ? Math.max(1, Math.round(damage * STAGE20_BREAK_DAMAGE_MULTIPLIER))
+            : m.bossStage === 30 && m.stage30WeakUntilMs !== undefined && gameNow < m.stage30WeakUntilMs
+              ? Math.max(1, Math.round(damage * STAGE30_WEAK_DAMAGE_MULTIPLIER))
+            : damage;
         const actualDamage = Math.min(m.hp, reducedDamage);
         m.hp -= actualDamage;
         waveDamageRef.current[sourceUnitId] =
           (waveDamageRef.current[sourceUnitId] ?? 0) + actualDamage;
         m.lastHitTime = gameNow;
         if (m.hp <= 0) {
-          if (m.bossStage === 15 && stage15State === "phoenix") {
-            const eggHp = Math.max(1, Math.round(m.maxHp * STAGE15_EGG_HP_RATIO));
+          if (m.isFinalBoss && (m.finalBossPhase ?? 4) < 4) {
+            const completedPhase = m.finalBossPhase ?? 1;
+            m.finalBossTargetPhase = (completedPhase + 1) as 2 | 3 | 4;
+            m.finalBossMode = "releasing";
+            m.finalBossTransitionEndsAtMs = gameNow + 1867;
+            m.hp = 1;
+            m.slowUntilMs = undefined;
+            m.paralyzeUntilMs = undefined;
+            m.statusImmunityUntilMs = undefined;
+            setStatus(`⚪ ${completedPhase}페이즈 종료! 핵에서 빛이 맵 끝으로 퍼져나갑니다.`);
+            addLog(`FINAL BOSS ${completedPhase}페이즈가 종료되었습니다.`);
+          } else if (m.isFinalBoss && (m.finalBossPhase ?? 4) === 4) {
+            m.finalBossMode = "releasing";
+            m.finalBossEnding = !m.finalBossDebugAutoPhase;
+            m.finalBossTargetPhase = m.finalBossDebugAutoPhase ? 1 : undefined;
+            m.finalBossTransitionEndsAtMs = gameNow + 1867;
+            m.hp = 1;
+            m.slowUntilMs = undefined;
+            m.paralyzeUntilMs = undefined;
+            m.statusImmunityUntilMs = undefined;
+            setStatus("⚪ 최종 핵이 마지막 빛을 맵 전체로 방출합니다!");
+            addLog("FINAL BOSS 4페이즈가 종료되었습니다.");
+          } else if (m.bossStage === 15 && stage15State === "phoenix") {
+            const eggHpRatio = (m.stage15ReviveCount ?? 0) >= 1
+              ? STAGE15_REPEAT_EGG_HP_RATIO
+              : STAGE15_EGG_HP_RATIO;
+            const eggHp = Math.max(1, Math.round(m.maxHp * eggHpRatio));
             m.stage15State = "transforming";
             m.stage15EggMaxHp = eggHp;
             m.stage15PhaseEndsAtMs = gameNow + STAGE15_TRANSFORM_MS;
@@ -1494,14 +2108,15 @@ export default function RogueTdPage() {
         const uDef = UNIT_TYPES[unit.typeId];
         const rangeTiles = unit.rangeTiles + (
           uDef.unitClass === "ranger"
-            ? RANGER_RANGE_BONUS_TILES[synergy.classTiers.ranger]
+            ? RANGER_RANGE_BONUS_TILES[synergy.classTiers.ranger] + getUnitTierRangeBonus(unit.tier, uDef.unitClass)
             : 0
         );
         const [unitRow, unitCol] = toRC(unit.cell);
 
         const getDistance = (monster: Monster) => {
-          const a = path[Math.min(monster.pathStep, path.length - 1)] ?? start;
-          const b = path[Math.min(monster.pathStep + 1, path.length - 1)] ?? a;
+          const monsterRoute = monster.route ?? path;
+          const a = monsterRoute[Math.min(monster.pathStep, monsterRoute.length - 1)] ?? start;
+          const b = monsterRoute[Math.min(monster.pathStep + 1, monsterRoute.length - 1)] ?? a;
           const [ar, ac] = toRC(a);
           const [br, bc] = toRC(b);
           const monsterRow = ar + (br - ar) * monster.progress;
@@ -1514,6 +2129,7 @@ export default function RogueTdPage() {
             m.hp > 0 &&
             !m.stage05ShieldActive &&
             !m.stage05BeingAbsorbed &&
+            !(m.isFinalBoss && m.finalBossMode !== "combat") &&
             !(m.bossStage === 15 && (m.stage15State === "transforming" || m.stage15State === "hatching")) &&
             getDistance(m) <= rangeTiles,
         );
@@ -1530,8 +2146,9 @@ export default function RogueTdPage() {
           continue;
         }
 
-        const targetPathCell = path[Math.min(target.pathStep, path.length - 1)] ?? start;
-        const nextTargetPathCell = path[Math.min(target.pathStep + 1, path.length - 1)] ?? targetPathCell;
+        const targetRoute = target.route ?? path;
+        const targetPathCell = targetRoute[Math.min(target.pathStep, targetRoute.length - 1)] ?? start;
+        const nextTargetPathCell = targetRoute[Math.min(target.pathStep + 1, targetRoute.length - 1)] ?? targetPathCell;
         const [, targetCol] = toRC(targetPathCell);
         const [, nextTargetCol] = toRC(nextTargetPathCell);
         const interpolatedTargetCol = targetCol + (nextTargetCol - targetCol) * target.progress;
@@ -1540,18 +2157,32 @@ export default function RogueTdPage() {
         }
         unit.targetId = target.id;
         unit.cooldownMs = uDef.unitClass === "warrior"
-          ? unit.attackIntervalMs / (1 + WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior])
+          ? unit.attackIntervalMs / (
+              1 +
+              WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior] +
+              getUnitTierAttackSpeedBonus(unit.tier, uDef.unitClass)
+            )
           : unit.attackIntervalMs;
         unit.lastAttackTimeMs = gameNow;
 
         // 상성 배율 계산
-        const multiplier = DAMAGE_MULTIPLIERS[uDef.specType][target.category] *
-          getSpecSynergyDamageMultiplier(uDef.specType, target.category, synergy);
+        const finalBossLightPenalty = target.isFinalBoss && target.finalBossMode === "combat" && (
+          target.finalBossPhase === 4 ||
+          (target.finalBossPhase === 1 && uDef.specType === "balance") ||
+          (target.finalBossPhase === 2 && uDef.specType === "land_spec") ||
+          (target.finalBossPhase === 3 && uDef.specType === "air_spec")
+        ) ? 0.5 : 1;
+        const multiplier = target.isFinalBoss && target.finalBossPhase === 4
+          ? 1
+          : DAMAGE_MULTIPLIERS[uDef.specType][target.category] *
+            getSpecSynergyDamageMultiplier(uDef.specType, target.category, synergy);
         const upgradeLevels = getUpgradeLevels(upgrades, unit.typeId);
         const baseDmg = uDef.damage * (
-          1 + (unit.tier - 1) * 0.5 + upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL
+          getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
+          upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL
         );
-        const calculatedDamage = Math.max(1, Math.round(baseDmg * multiplier));
+        const penalizedBaseDmg = baseDmg * finalBossLightPenalty;
+        const calculatedDamage = Math.max(1, Math.round(penalizedBaseDmg * multiplier));
 
         // 유닛별 투사체 이펙트 및 발사 개수 분기
         if (unit.typeId === "dual_swordsman") {
@@ -1565,7 +2196,7 @@ export default function RogueTdPage() {
             fromCell: unit.cell,
             targetId: target.id,
             damage: firstHitDamage,
-            baseDamage: baseDmg,
+            baseDamage: penalizedBaseDmg,
             specType: uDef.specType,
             rangeTiles,
             progress: 0,
@@ -1580,7 +2211,7 @@ export default function RogueTdPage() {
             fromCell: unit.cell,
             targetId: target.id,
             damage: secondHitDamage,
-            baseDamage: baseDmg,
+            baseDamage: penalizedBaseDmg,
             specType: uDef.specType,
             rangeTiles,
             progress: 0,
@@ -1618,7 +2249,7 @@ export default function RogueTdPage() {
             fromCell: unit.cell,
             targetId: target.id,
             damage: calculatedDamage,
-            baseDamage: baseDmg,
+            baseDamage: penalizedBaseDmg,
             specType: uDef.specType,
             rangeTiles,
             progress: 0,
@@ -1667,6 +2298,7 @@ export default function RogueTdPage() {
         cooldownMs: 0,
         targetId: null,
         lastAttackTimeMs: undefined,
+        stunnedUntilMs: undefined,
       }));
       unitsRef.current = restedUnits;
       setUnits(restedUnits);
@@ -1716,9 +2348,12 @@ export default function RogueTdPage() {
         setStatus("🎉 FINAL BOSS를 처치했습니다! 게임 클리어!");
         addLog("FINAL STAGE를 클리어해 게임을 완료했습니다.");
       } else {
-        setWave((w) => w + 1);
-        waveTimeRemainingMs.current = getWaveTimeLimit(wave + 1) * 1000;
-        setWaveTimeRemainingSec(getWaveTimeLimit(wave + 1));
+        const nextWave = wave + 1;
+        setWave(nextWave);
+        setShowStageBossInfo(false);
+        waveTimeRemainingMs.current = getWaveTimeLimit(nextWave) * 1000;
+        setWaveTimeRemainingSec(getWaveTimeLimit(nextWave));
+        if (isBossWave(nextWave)) triggerBossWarning(nextWave);
       }
     }
   }, [monsters.length, toSpawn, running, life, wave, waveTimeRemainingSec]);
@@ -1733,8 +2368,16 @@ export default function RogueTdPage() {
       const sellPrice = UNIT_SELL_PRICES[unit.tier as 1 | 2 | 3];
       return (
         <ContextActionMenu actions={{
+          top: {
+            label: unit.protected ? "보호 해제" : "보호",
+            onClick: () => toggleMapUnitProtection(unit.id),
+          },
           left: { label: "회수", onClick: () => recallMapUnit(unit.id) },
-          right: { label: `판매 ${sellPrice}G`, onClick: () => sellMapUnit(unit.id) },
+          right: {
+            label: `판매 ${sellPrice}G`,
+            disabled: unit.protected,
+            onClick: () => sellMapUnit(unit.id),
+          },
           bottom: {
             label: "승급",
             disabled: !canCombine,
@@ -1876,7 +2519,8 @@ export default function RogueTdPage() {
           onSetGold={(value) => setGold(Math.max(0, Math.floor(value || 0)))}
           onSetPlayerLevel={(value) => { setPlayerLevel(Math.min(MAX_PLAYER_LEVEL, Math.max(1, Math.floor(value || 1)))); setPlayerXp(0); }}
           onAddUnit={handleDebugAddUnit}
-          onSpawnMonsters={handleDebugSpawnMonsters}
+          onApplyStage={handleDebugApplyStage}
+          onSpawnStage={handleDebugSpawnStage}
           onClearMonsters={handleDebugClearMonsters}
           onSetTimer={handleDebugSetTimer}
           onClose={() => { setDebugMode(false); setDebugBrush(null); }}
@@ -1909,6 +2553,20 @@ export default function RogueTdPage() {
                 {isFinalStage(wave) ? "FINAL STAGE" : `${isBossWave(wave) ? "BOSS " : ""}STAGE ${wave}`}
               </strong>
             </div>
+            {isBossWave(wave) && (
+              <div className="bossInfoSlot">
+                <button
+                  type="button"
+                  className={`bossInfoButton ${showStageBossInfo ? "active" : ""}`}
+                  onClick={() => {
+                    setShowStageBossInfo((current) => !current);
+                    setSelectedBossId(null);
+                    setSelectedUnitId(null);
+                    setSelectedStorageIndex(null);
+                  }}
+                >보스 설명 보기</button>
+              </div>
+            )}
             <div className={`waveTimer ${running && waveTimeRemainingSec <= 10 ? "danger" : ""}`}>
               <span>TIME</span>
               <strong>{running ? waveTimeRemainingSec : waveTimeLimit}</strong>
@@ -1945,6 +2603,7 @@ export default function RogueTdPage() {
             animationPaused={!running || paused}
             animationSpeed={gameSpeed}
             boardShaking={gameTimeMs.current < boardShakeUntilMs.current}
+            bossWarning={bossWarning}
             activeCellIndex={activeCellIndex}
             highlightedPlacementCells={highlightMapPlacement}
             renderCellMenu={renderCellMenu}
@@ -1952,8 +2611,8 @@ export default function RogueTdPage() {
 
           <UpgradeStrip upgrades={upgrades} />
           <div className="centerWorkspace">
-            {selectedBoss ? (
-              <BossDetailPanel boss={selectedBoss} gameNowMs={gameTimeMs.current} />
+            {bossDetailTarget ? (
+              <BossDetailPanel boss={bossDetailTarget} gameNowMs={gameTimeMs.current} />
             ) : (
               <UnitDetailPanel unit={selectedDetailUnit} upgrades={upgrades} synergy={synergy} emptyMessage={status} />
             )}

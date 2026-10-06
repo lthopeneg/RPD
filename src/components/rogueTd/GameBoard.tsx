@@ -12,6 +12,10 @@ import {
   STAGE05_SUMMON_CAST_MS,
   STAGE10_STOMP_RADIUS_TILES,
   STAGE10_STOMP_WARNING_MS,
+  STAGE20_SHIELD_CAST_MS,
+  STAGE25_REFORGE_CAST_MS,
+  STAGE30_MAGNETIC_RADIUS_TILES,
+  STAGE30_TELEPORT_CAST_MS,
   UNIT_TYPES,
 } from "../../games/rogueTd/constants";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
@@ -79,9 +83,97 @@ interface Props {
   animationPaused: boolean;
   animationSpeed: 1 | 2;
   boardShaking: boolean;
+  bossWarning: { stage: number; token: number } | null;
   activeCellIndex: number | null;
   highlightedPlacementCells: boolean;
   renderCellMenu: (cellIndex: number) => ReactNode;
+}
+
+interface FinalBossBolt {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  duration: number;
+}
+
+function FinalBossLightning({ paused, speed }: { paused: boolean; speed: 1 | 2 }) {
+  const [bolts, setBolts] = useState<FinalBossBolt[]>([]);
+
+  useEffect(() => {
+    if (paused) {
+      setBolts([]);
+      return;
+    }
+
+    setBolts([]);
+    let cancelled = false;
+    let nextId = 0;
+    const timers = new Set<number>();
+
+    const schedule = () => {
+      const timer = window.setTimeout(() => {
+        timers.delete(timer);
+        if (cancelled) return;
+
+        const count = Math.random() < 0.42 ? 2 + Math.floor(Math.random() * 2) : 1;
+        const created = Array.from({ length: count }, () => {
+          const sizeTier = Math.floor(Math.random() * 3);
+          const size = sizeTier === 0
+            ? { width: 14 + Math.random() * 3, height: 28 + Math.random() * 6 }
+            : sizeTier === 1
+              ? { width: 20 + Math.random() * 4, height: 40 + Math.random() * 8 }
+              : { width: 27 + Math.random() * 5, height: 54 + Math.random() * 10 };
+          const availableX = 56 - size.width / 2;
+          const availableY = 56 - size.height / 2;
+          return {
+            id: nextId++,
+            x: (Math.random() * 2 - 1) * availableX,
+            y: (Math.random() * 2 - 1) * availableY,
+            width: size.width,
+            height: size.height,
+            rotation: -24 + Math.random() * 48,
+            duration: (253 + Math.random() * 180) / speed,
+          };
+        });
+
+        setBolts((current) => [...current, ...created]);
+        created.forEach((bolt) => {
+          const removeTimer = window.setTimeout(() => {
+            timers.delete(removeTimer);
+            setBolts((current) => current.filter((item) => item.id !== bolt.id));
+          }, bolt.duration + 80);
+          timers.add(removeTimer);
+        });
+        schedule();
+      }, (200 + Math.random() * 467) / speed);
+      timers.add(timer);
+    };
+
+    schedule();
+    return () => {
+      cancelled = true;
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [paused, speed]);
+
+  return bolts.map((bolt) => (
+    <span
+      key={bolt.id}
+      className="finalBossArcSpark"
+      style={{
+        left: `calc(50% + ${bolt.x}px)`,
+        top: `calc(50% - 28px + ${bolt.y}px)`,
+        width: `${bolt.width}px`,
+        height: `${bolt.height}px`,
+        animationDuration: `${bolt.duration}ms`,
+        "--arc-r": `${bolt.rotation}deg`,
+      } as CSSProperties}
+      aria-hidden="true"
+    />
+  ));
 }
 
 const MONSTER_SPRITE_CLASSES: Record<MonsterCategory, string> = {
@@ -96,14 +188,12 @@ const BOSS_SPRITE_CLASSES: Partial<Record<number, string>> = {
   20: "bossStage20Sprite",
   25: "bossStage25Sprite",
   30: "bossStage30Sprite",
-  33: "bossStage33Sprite",
-  34: "bossStage34Sprite",
-  35: "bossStage35Sprite",
 };
-const FINAL_BOSS_SPRITE_CLASSES: Record<1 | 2 | 3, string> = {
+const FINAL_BOSS_SPRITE_CLASSES: Record<1 | 2 | 3 | 4, string> = {
   1: "finalBossPhase1Sprite",
   2: "finalBossPhase2Sprite",
   3: "finalBossPhase3Sprite",
+  4: "finalBossPhase4Sprite",
 };
 const BOSS_NAMES: Record<MonsterCategory, string> = {
   human: "밸런스형",
@@ -124,9 +214,36 @@ export default function GameBoard(p: Props) {
       : 0)
     : 0;
   const now = p.gameNowMs;
+  const finalBoss = p.monsters.find((monster) => monster.isFinalBoss);
+  const finalBossMode = finalBoss?.finalBossMode;
+  const drainedPhase = finalBossMode === "absorbing"
+    ? finalBoss?.finalBossTargetPhase
+    : finalBossMode === "flash" && finalBoss?.finalBossFlashNext === "combat"
+      ? finalBoss?.finalBossTargetPhase
+    : finalBossMode === "combat"
+      ? finalBoss?.finalBossPhase
+      : undefined;
+  const isUnitLightDrained = (unit: Unit) => {
+    if (drainedPhase === undefined) return false;
+    const specType = UNIT_TYPES[unit.typeId].specType;
+    return drainedPhase === 4 ||
+      (drainedPhase === 1 && specType === "balance") ||
+      (drainedPhase === 2 && specType === "land_spec") ||
+      (drainedPhase === 3 && specType === "air_spec");
+  };
+  const stage25WarningCells = new Set(
+    p.monsters.flatMap((monster) =>
+      monster.bossStage === 25 &&
+      monster.stage25CastEndsAtMs !== undefined &&
+      now < monster.stage25CastEndsAtMs
+        ? monster.stage25TargetCells ?? []
+        : [],
+    ),
+  );
   const getMonsterBoardPosition = (monster: Monster) => {
-    const from = p.path[Math.min(monster.pathStep, p.path.length - 1)] ?? p.start;
-    const to = p.path[Math.min(monster.pathStep + 1, p.path.length - 1)] ?? from;
+    const monsterRoute = monster.route ?? p.path;
+    const from = monsterRoute[Math.min(monster.pathStep, monsterRoute.length - 1)] ?? p.start;
+    const to = monsterRoute[Math.min(monster.pathStep + 1, monsterRoute.length - 1)] ?? from;
     const fromRow = Math.floor(from / COLS);
     const fromCol = from % COLS;
     const toRow = Math.floor(to / COLS);
@@ -136,6 +253,9 @@ export default function GameBoard(p: Props) {
       y: ((fromRow + (toRow - fromRow) * monster.progress + 0.5) / ROWS) * 100,
     };
   };
+  const finalBossPosition = finalBoss
+    ? getMonsterBoardPosition(finalBoss)
+    : { x: 50, y: 50 };
 
   useEffect(() => {
     setPathPulseStart(0);
@@ -149,15 +269,24 @@ export default function GameBoard(p: Props) {
   return (
     <div className="boardShell">
       <div
-        className={`board ${p.boardShaking ? "stompShaking" : ""}`}
+        className={`board ${p.boardShaking ? "stompShaking" : ""} ${finalBossMode === "flash" ? "finalBossTransitionFlash" : ""} ${finalBossMode === "absorbing" ? "finalBossAbsorbing" : ""} ${finalBossMode === "releasing" ? "finalBossReleasing" : ""} ${finalBossMode === "combat" || (finalBossMode === "flash" && finalBoss?.finalBossFlashNext === "combat") ? "finalBossDimmed" : ""}`}
         style={{
           gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
           gridTemplateRows: `repeat(${ROWS}, minmax(0, 1fr))`,
           aspectRatio: `${COLS} / ${ROWS}`,
           animationDuration: `${450 / p.animationSpeed}ms`,
           animationPlayState: p.animationPaused ? "paused" : "running",
-        }}
+          "--final-boss-x": `${finalBossPosition.x}%`,
+          "--final-boss-y": `${finalBossPosition.y}%`,
+        } as CSSProperties}
       >
+        {p.bossWarning && (
+          <div key={p.bossWarning.token} className="bossStageWarning" role="status" aria-live="assertive">
+            <span className="bossWarningTriangle" aria-hidden="true"><i>!</i></span>
+            <strong>WARNING!</strong>
+            <em>{p.bossWarning.stage === 36 ? "FINAL BOSS APPROACHING" : `BOSS STAGE ${p.bossWarning.stage}`}</em>
+          </div>
+        )}
         {p.grid.map((cell, i) => {
           const u = unitByCell.get(i);
           const roadTile = getRoadTile(i, pathCells);
@@ -178,6 +307,7 @@ export default function GameBoard(p: Props) {
             classes.push("path");
           if (u?.id === p.selectedUnitId) classes.push("selectedUnit");
           if (u) classes.push("unitOccupied");
+          if (u && isUnitLightDrained(u)) classes.push("lightDrainedUnit");
           if (i === p.activeCellIndex) classes.push("menuOpen");
           if (
             p.highlightedPlacementCells &&
@@ -217,6 +347,9 @@ export default function GameBoard(p: Props) {
                   aria-hidden="true"
                 />
               )}
+              {stage25WarningCells.has(i) && (
+                <span className="stage25CellWarning" aria-hidden="true" />
+              )}
 
               {!u && (
                 <span className="cellContent">
@@ -230,6 +363,38 @@ export default function GameBoard(p: Props) {
 
               {u && (
                 <div className={`unitWrapper ${isStunned ? "stunned" : ""}`} key={u.id}>
+                  {u.tier >= 2 && (
+                    <span
+                      className={`unitTierTwoAura ${u.tier === 3 ? "tierThreeBase" : ""}`}
+                      style={{
+                        "--unit-tier-color": UNIT_TYPES[u.typeId].color,
+                        "--unit-tier-duration": `${1450 / p.animationSpeed}ms`,
+                        "--unit-spike-duration": `${920 / p.animationSpeed}ms`,
+                        animationPlayState: p.animationPaused ? "paused" : "running",
+                      } as CSSProperties}
+                      aria-hidden="true"
+                    >
+                      {Array.from({ length: 8 }, (_, spikeIndex) => (
+                        <i key={spikeIndex} />
+                      ))}
+                    </span>
+                  )}
+                  {u.tier === 3 && (
+                    <span
+                      className="unitTierThreeOrbit"
+                      style={{
+                        "--unit-orbit-color": UNIT_TYPES[u.typeId].color,
+                        "--unit-orbit-duration": `${2600 / p.animationSpeed}ms`,
+                        "--unit-orbit-pulse-duration": `${780 / p.animationSpeed}ms`,
+                        animationPlayState: p.animationPaused ? "paused" : "running",
+                      } as CSSProperties}
+                      aria-hidden="true"
+                    >
+                      {Array.from({ length: 8 }, (_, shardIndex) => (
+                        <i key={shardIndex} />
+                      ))}
+                    </span>
+                  )}
                   {spriteClass ? (
                     <span
                       className={`unit ${spriteClass} ${u.facing === "left" ? "facingLeft" : ""} ${!isStunned && attackAge >= 0 && attackAge < 360 ? "attacking" : ""}`}
@@ -244,11 +409,6 @@ export default function GameBoard(p: Props) {
                       {UNIT_TYPES[u.typeId]?.icon ?? "⚔️"}
                     </span>
                   )}
-                  {u.tier > 1 && (
-                    <span className="unitTierBadge">
-                      {"★".repeat(u.tier)}
-                    </span>
-                  )}
                   {isStunned && (
                     <span
                       className="unitStunStars"
@@ -260,6 +420,9 @@ export default function GameBoard(p: Props) {
                     >
                       <i>★</i><i>★</i><i>★</i>
                     </span>
+                  )}
+                  {u.protected && (
+                    <span className="unitProtectionBadge" aria-label="판매 보호 중" title="판매 보호 중" />
                   )}
                   <UnitTooltip
                     typeId={u.typeId}
@@ -312,6 +475,58 @@ export default function GameBoard(p: Props) {
             );
           })}
 
+        {p.monsters.filter((monster) =>
+          monster.bossStage === 30 &&
+          monster.stage30TeleportEndsAtMs !== undefined &&
+          monster.stage30TeleportTargetStep !== undefined &&
+          now < monster.stage30TeleportEndsAtMs
+        ).map((boss) => {
+          const bossRoute = boss.route ?? p.path;
+          const targetCell = bossRoute[boss.stage30TeleportTargetStep ?? 0] ?? p.start;
+          const row = Math.floor(targetCell / COLS);
+          const col = targetCell % COLS;
+          return (
+            <span
+              key={`stage30-teleport-${boss.id}`}
+              className="stage30TeleportTarget"
+              style={{
+                left: `${((col + 0.5) / COLS) * 100}%`,
+                top: `${((row + 0.5) / ROWS) * 100}%`,
+                width: `${(STAGE30_MAGNETIC_RADIUS_TILES * 2 * 100) / COLS}%`,
+                height: `${(STAGE30_MAGNETIC_RADIUS_TILES * 2 * 100) / ROWS}%`,
+                animationDuration: `${STAGE30_TELEPORT_CAST_MS / p.animationSpeed}ms`,
+                animationPlayState: p.animationPaused ? "paused" : "running",
+              }}
+              aria-hidden="true"
+            />
+          );
+        })}
+
+        {p.monsters.filter((monster) =>
+          monster.bossStage === 30 &&
+          monster.stage30MagneticFieldUntilMs !== undefined &&
+          monster.stage30MagneticFieldCell !== undefined &&
+          now < monster.stage30MagneticFieldUntilMs
+        ).map((boss) => {
+          const fieldCell = boss.stage30MagneticFieldCell ?? p.start;
+          const row = Math.floor(fieldCell / COLS);
+          const col = fieldCell % COLS;
+          return (
+            <span
+              key={`stage30-field-${boss.id}`}
+              className="stage30MagneticField"
+              style={{
+                left: `${((col + 0.5) / COLS) * 100}%`,
+                top: `${((row + 0.5) / ROWS) * 100}%`,
+                width: `${(STAGE30_MAGNETIC_RADIUS_TILES * 2 * 100) / COLS}%`,
+                height: `${(STAGE30_MAGNETIC_RADIUS_TILES * 2 * 100) / ROWS}%`,
+                animationPlayState: p.animationPaused ? "paused" : "running",
+              }}
+              aria-hidden="true"
+            />
+          );
+        })}
+
         {p.projectiles.filter((projectile) => projectile.delayMs <= 0).map((projectile) => {
           const [fromRow, fromCol] = [
             Math.floor(projectile.fromCell / COLS),
@@ -332,11 +547,12 @@ export default function GameBoard(p: Props) {
           let targetX = startX;
           let targetY = startY;
 
+          const targetRoute = targetMonster.route ?? p.path;
           const a =
-            p.path[Math.min(targetMonster.pathStep, p.path.length - 1)] ??
+            targetRoute[Math.min(targetMonster.pathStep, targetRoute.length - 1)] ??
             p.start;
           const b =
-            p.path[Math.min(targetMonster.pathStep + 1, p.path.length - 1)] ??
+            targetRoute[Math.min(targetMonster.pathStep + 1, targetRoute.length - 1)] ??
             a;
           const ar = Math.floor(a / COLS),
             ac = a % COLS,
@@ -440,8 +656,9 @@ export default function GameBoard(p: Props) {
           })}
 
         {p.monsters.map((m) => {
-          const a = p.path[Math.min(m.pathStep, p.path.length - 1)] ?? p.start;
-          const b = p.path[Math.min(m.pathStep + 1, p.path.length - 1)] ?? a;
+          const monsterRoute = m.route ?? p.path;
+          const a = monsterRoute[Math.min(m.pathStep, monsterRoute.length - 1)] ?? p.start;
+          const b = monsterRoute[Math.min(m.pathStep + 1, monsterRoute.length - 1)] ?? a;
           const ar = Math.floor(a / COLS),
             ac = a % COLS,
             br = Math.floor(b / COLS),
@@ -474,6 +691,38 @@ export default function GameBoard(p: Props) {
             m.stage10StompImpactAtMs !== undefined &&
             now < m.stage10StompImpactAtMs;
           const stage15State = m.stage15State ?? "phoenix";
+          const isStage20Charging =
+            m.bossStage === 20 && m.stage20State === "charging";
+          const isStage20Shielded =
+            m.bossStage === 20 &&
+            (m.stage20ShieldHp ?? 0) > 0 &&
+            (m.stage20State === "shielded" || isStage20Charging);
+          const isStage20Stunned =
+            m.bossStage === 20 && m.stage20State === "stunned";
+          const isStage20ShieldHit =
+            isStage20Shielded &&
+            m.stage20ShieldHitUntilMs !== undefined &&
+            now < m.stage20ShieldHitUntilMs;
+          const isStage20ShieldBreaking =
+            m.stage20ShieldBreakUntilMs !== undefined &&
+            now < m.stage20ShieldBreakUntilMs;
+          const isStage25Casting =
+            m.bossStage === 25 &&
+            m.stage25CastEndsAtMs !== undefined &&
+            now < m.stage25CastEndsAtMs;
+          const isStage30 = m.bossStage === 30;
+          const isStage30Teleporting =
+            isStage30 && m.stage30TeleportEndsAtMs !== undefined && now < m.stage30TeleportEndsAtMs;
+          const isStage30Weak =
+            isStage30 && m.stage30WeakUntilMs !== undefined && now < m.stage30WeakUntilMs;
+          const isFinalBossPhase1 = m.isFinalBoss && m.finalBossPhase === 1;
+          const isFinalBossPhase2 = m.isFinalBoss && m.finalBossPhase === 2;
+          const isFinalBossPhase3 = m.isFinalBoss && m.finalBossPhase === 3;
+          const isFinalBossPhase4 = m.isFinalBoss && m.finalBossPhase === 4;
+          const usesFinalBossAura = isFinalBossPhase1 || isFinalBossPhase2 || isFinalBossPhase3 || isFinalBossPhase4;
+          const stage20ShieldPercent = m.stage20ShieldMaxHp
+            ? Math.max(0, ((m.stage20ShieldHp ?? 0) / m.stage20ShieldMaxHp) * 100)
+            : 0;
           const sniperSpecialTarget = p.projectiles.some((projectile) =>
             projectile.targetId === m.id &&
             projectile.sourceTypeId === "sniper" &&
@@ -503,7 +752,7 @@ export default function GameBoard(p: Props) {
           return (
             <span
               key={m.id}
-              className={`monster ${m.category} ${m.isBoss ? "boss" : ""} ${m.id === p.selectedBossId ? "selectedBoss" : ""} ${m.isFinalBoss ? "finalBoss" : ""} ${m.summonedByBossId !== undefined ? "stage05Skeleton" : ""} ${m.stage05BeingAbsorbed ? "stage05BeingAbsorbed" : ""} ${m.stage05ShieldActive ? "stage05SummonShield" : ""} ${isStage05Summoning ? "stage05Summoning" : ""} ${isStage05Absorbing ? "stage05Absorbing" : ""} ${m.bossStage === 15 ? `stage15-${stage15State}` : ""} ${isHit ? "hitFlash" : ""} ${isBurning ? "burning" : ""} ${isBossSniperHit ? "bossSniperHit" : ""} ${
+              className={`monster ${m.category} ${m.isBoss ? "boss" : ""} ${m.id === p.selectedBossId ? "selectedBoss" : ""} ${m.isFinalBoss ? "finalBoss" : ""} ${isFinalBossPhase1 ? "finalBossPhase1Test" : ""} ${isFinalBossPhase2 ? "finalBossPhase2Test" : ""} ${isFinalBossPhase3 ? "finalBossPhase3Test" : ""} ${isFinalBossPhase4 ? "finalBossPhase4Test" : ""} ${m.summonedByBossId !== undefined ? "stage05Skeleton" : ""} ${m.stage05BeingAbsorbed ? "stage05BeingAbsorbed" : ""} ${m.stage05ShieldActive ? "stage05SummonShield" : ""} ${isStage05Summoning ? "stage05Summoning" : ""} ${isStage05Absorbing ? "stage05Absorbing" : ""} ${m.bossStage === 15 ? `stage15-${stage15State}` : ""} ${isStage20Charging ? "stage20Charging" : ""} ${isStage20Shielded ? "stage20Shielded" : ""} ${isStage20Stunned ? "stage20Stunned" : ""} ${isStage20ShieldBreaking ? "stage20ShieldBreaking" : ""} ${isStage30Teleporting ? "stage30Teleporting" : ""} ${isStage30Weak ? "stage30Weak" : ""} ${isHit ? "hitFlash" : ""} ${isBurning ? "burning" : ""} ${isBossSniperHit ? "bossSniperHit" : ""} ${
                 isParalyzed ? "paralyzed" : isSlow ? "slowed" : ""
               }`}
               style={{
@@ -533,7 +782,7 @@ export default function GameBoard(p: Props) {
                   }
                 : undefined}
               title={m.isBoss
-                ? `${m.isFinalBoss ? `FINAL BOSS ${m.finalBossPhase}단계` : `${BOSS_NAMES[m.category]} 보스`} HP ${m.hp}/${displayedMaxHp} | 완주 ${m.laps}회 (제한 없음)`
+                ? `${m.isFinalBoss ? `FINAL BOSS ${m.finalBossPhase}단계` : `${BOSS_NAMES[m.category]} 보스`} HP ${m.hp}/${displayedMaxHp}`
                 : `[${m.category}] HP ${m.hp}/${m.maxHp} | Laps: ${m.laps}/5`}
             >
               {m.bossStage === 5 && (
@@ -576,11 +825,78 @@ export default function GameBoard(p: Props) {
                   aria-hidden="true"
                 />
               )}
+              {isStage20Charging && (
+                <span
+                  className="stage20ChargeEffect"
+                  style={{
+                    animationDuration: `${STAGE20_SHIELD_CAST_MS / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              {isStage20Shielded && (
+                <>
+                  <span className="stage20ShieldIcon" aria-hidden="true" />
+                  <span className="stage20ShieldEffect" aria-hidden="true" />
+                </>
+              )}
+              {isStage20ShieldHit && (
+                <span className="stage20ShieldHitEffect" aria-hidden="true" />
+              )}
+              {isStage20ShieldBreaking && (
+                <span className="stage20ShieldBreakEffect" aria-hidden="true" />
+              )}
+              {isStage20Stunned && (
+                <span className="stage20StunEffect" aria-hidden="true">
+                  <i /><i /><i />
+                </span>
+              )}
+              {isStage25Casting && (
+                <span
+                  className="stage25ReforgeEffect"
+                  style={{
+                    animationDuration: `${STAGE25_REFORGE_CAST_MS / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              {isStage30 && (
+                <span
+                  className={`stage30OrbitEffect move-${moveDirection}`}
+                  style={{
+                    animationDuration: `${2600 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                >
+                  {Array.from({ length: m.stage30StoneCount ?? 0 }, (_, index) => <i key={index} />)}
+                </span>
+              )}
+              {usesFinalBossAura && (
+                <span
+                  className="finalBossAuraBack"
+                  style={{
+                    animationDuration: `${6200 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
               <span
                 className={`monsterSprite ${m.isBoss ? "bossSprite" : ""} ${displayedSpriteClass} move-${moveDirection}`}
                 style={{
                   animationDuration: `${(
-                    m.bossStage === 5
+                    isFinalBossPhase1
+                      ? 1800
+                    : isFinalBossPhase2
+                      ? 1900
+                    : isFinalBossPhase3
+                      ? 1700
+                    : isFinalBossPhase4
+                      ? 2100
+                    : m.bossStage === 5
                       ? isStage05Summoning
                         ? STAGE05_SUMMON_CAST_MS
                         : isStage05Absorbing
@@ -594,12 +910,23 @@ export default function GameBoard(p: Props) {
                             : stage15State === "egg"
                               ? 1000
                               : 840
-                        : 480
+                          : m.bossStage === 20
+                            ? moveDirection === "left" || moveDirection === "right"
+                              ? 1120
+                              : 1400
+                            : m.bossStage === 25
+                              ? moveDirection === "left" || moveDirection === "right"
+                                ? 1540
+                                : 2060
+                              : m.bossStage === 30
+                                ? 1400
+                            : 480
                   ) / p.animationSpeed}ms`,
-                  animationPlayState: p.animationPaused || isStage10Stomping ? "paused" : "running",
+                  animationPlayState: p.animationPaused || isStage10Stomping || isStage20Charging || isStage20Stunned || isStage25Casting ? "paused" : "running",
                 }}
                 aria-hidden="true"
               />
+              {usesFinalBossAura && <FinalBossLightning paused={p.animationPaused} speed={p.animationSpeed} />}
               {sniperSpecialTarget && (
                 <span
                   className={`sniperSpecialMark ${m.isBoss ? "bossSniperMark" : "executeSniperMark"}`}
@@ -613,11 +940,27 @@ export default function GameBoard(p: Props) {
                   부활 {Math.max(0, (m.stage15ReviveAtMs - now) / 1000).toFixed(1)}s
                 </span>
               )}
+              {isStage20Shielded && m.stage20ShieldMaxHp !== undefined && (
+                <span className="stage20ShieldBar">
+                  <span
+                    className="stage20ShieldBarFill"
+                    style={{ width: `${stage20ShieldPercent}%` }}
+                  />
+                  <span className="stage20ShieldBarText">
+                    {Math.ceil(m.stage20ShieldHp ?? 0)}/{m.stage20ShieldMaxHp}
+                  </span>
+                </span>
+              )}
+              {isStage30 && (m.stage30StoneCount ?? 0) > 0 && (
+                <span className="stage30StoneBar">
+                  부유석 {m.stage30StoneCount}/4 · {Math.ceil(m.stage30StoneHp ?? 0)}/{m.stage30StoneMaxHp}
+                </span>
+              )}
 
               {/* 완주 횟수 라벨 배지 */}
-              {m.laps > 0 && (
+              {!m.isBoss && m.laps > 0 && (
                 <span className="monsterLapBadge">
-                  🔄 {m.laps}{m.isBoss ? "" : "/5"}
+                  🔄 {m.laps}/5
                 </span>
               )}
 

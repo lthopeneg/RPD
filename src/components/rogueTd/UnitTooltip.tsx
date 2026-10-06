@@ -1,4 +1,10 @@
-import { UNIT_TYPES, UPGRADE_DAMAGE_PER_LEVEL } from "../../games/rogueTd/constants";
+import {
+  UNIT_TYPES,
+  UPGRADE_DAMAGE_PER_LEVEL,
+  getUnitTierAttackSpeedBonus,
+  getUnitTierDamageMultiplier,
+  getUnitTierRangeBonus,
+} from "../../games/rogueTd/constants";
 import type { UnitTypeId } from "../../games/rogueTd/types";
 
 interface Props {
@@ -22,14 +28,14 @@ export default function UnitTooltip({
   rangerRangeBonusTiles,
 }: Props) {
   const unit = UNIT_TYPES[typeId];
-  const baseDamage = unit.damage * (1 + (tier - 1) * 0.5);
+  const baseDamage = unit.damage * getUnitTierDamageMultiplier(tier, unit.unitClass);
   const upgradeDamage = unit.damage * upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL;
   const totalDamage = baseDamage + upgradeDamage;
   const attackInterval = unit.unitClass === "warrior"
-    ? unit.attackIntervalMs / (1 + warriorAttackSpeedBonus)
+    ? unit.attackIntervalMs / (1 + warriorAttackSpeedBonus + getUnitTierAttackSpeedBonus(tier, unit.unitClass))
     : unit.attackIntervalMs;
   const attacksPerSecond = 1000 / attackInterval;
-  const range = unit.rangeTiles + (unit.unitClass === "ranger" ? rangerRangeBonusTiles : 0);
+  const range = unit.rangeTiles + getUnitTierRangeBonus(tier, unit.unitClass) + (unit.unitClass === "ranger" ? rangerRangeBonusTiles : 0);
 
   return (
     <div className="unitTooltip" role="tooltip">
