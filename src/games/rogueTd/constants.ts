@@ -117,8 +117,9 @@ export const getBossCategory = (wave: number): MonsterCategory => {
   if (isFinalStage(wave)) return "human";
   return MONSTER_ROTATION[(Math.floor(wave / BOSS_WAVE_INTERVAL) - 1) % MONSTER_ROTATION.length];
 };
+export const FINAL_BOSS_PHASE_HP = 20000;
 export const getBossHp = (wave: number) => {
-  if (isFinalStage(wave)) return 20000;
+  if (isFinalStage(wave)) return FINAL_BOSS_PHASE_HP * 4;
   const baseHp = BOSS_HP * 3 * 1.75 ** (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1);
   return Math.round(baseHp * (wave === 20 ? 0.75 : 1));
 };
@@ -193,7 +194,7 @@ export const STAGE30_MAGNETIC_FIELD_MS = 4000;
 export const STAGE30_MAGNETIC_RADIUS_TILES = 2;
 export const STAGE30_MAGNETIC_STUN_MS = 3000;
 export const BOSS_SNIPER_DAMAGE_MULTIPLIER = 3; // 즉사 발동 시 보스 대상 테스트 피해 배율
-export const FIRE_BURN_CHANCE = 0.10;
+export const FIRE_AREA_CHANCE = 0.30;
 export const ICE_SLOW_CHANCE = 0.10;
 export const LIGHTNING_PARALYZE_CHANCE = 0.10;
 export const SNIPER_EXECUTE_CHANCE = 0.05;
@@ -201,7 +202,7 @@ export const SNIPER_EXECUTE_CHANCE = 0.05;
 // 신규 룰 관련 상수
 export const MAX_MONSTER_LAPS = 5; // 5회 완주 시 즉시 게임 오버
 export const WAVE_TIME_LIMIT_SEC = 90;
-export const BOSS_WAVE_TIME_LIMIT_SEC = 120;
+export const BOSS_WAVE_TIME_LIMIT_SEC = 90;
 export const FINAL_WAVE_TIME_LIMIT_SEC = 360;
 export const getWaveTimeLimit = (wave: number) =>
   isFinalStage(wave)
@@ -299,7 +300,7 @@ export const UNIT_TYPES: Record<UnitTypeId, UnitTypeDef> = {
     damage: 11,
     rangeTiles: 2.2,
     attackIntervalMs: 900,
-    description: "밸런스형 범위 마법사 (10% 확률로 50% 화상 추가피해)",
+    description: "밸런스형 마법사 (30% 확률로 주변 1.5칸 범위 피해)",
   },
   ice_mage: {
     id: "ice_mage",

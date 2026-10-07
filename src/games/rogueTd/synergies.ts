@@ -1,15 +1,15 @@
 import { UNIT_TYPES } from "./constants";
 import type { MonsterCategory, SpecType, Unit, UnitClass } from "./types";
 
-export const SYNERGY_THRESHOLDS = [3, 6, 9, 12, 15] as const;
+export const SYNERGY_THRESHOLDS = [3, 6, 9, 12] as const;
 
 // 단계 0은 시너지 미발동. 아래 수치는 플레이 테스트용이다.
-export const WARRIOR_ATTACK_SPEED_BONUS = [0, 0.05, 0.10, 0.15, 0.20, 0.25] as const;
-export const MAGE_STATUS_CHANCE_BONUS = [0, 0.02, 0.04, 0.06, 0.08, 0.10] as const;
-export const RANGER_RANGE_BONUS_TILES = [0, 0.15, 0.30, 0.45, 0.60, 0.75] as const;
-export const BALANCE_DAMAGE_BONUS = [0, 0.03, 0.06, 0.09, 0.12, 0.15] as const;
-export const LAND_DAMAGE_BONUS = [0, 0.05, 0.10, 0.15, 0.20, 0.25] as const;
-export const AIR_DAMAGE_BONUS = [0, 0.05, 0.10, 0.15, 0.20, 0.25] as const;
+export const WARRIOR_ATTACK_SPEED_BONUS = [0, 0.05, 0.10, 0.15, 0.20] as const;
+export const MAGE_STATUS_CHANCE_BONUS = [0, 0.05, 0.10, 0.15, 0.20] as const;
+export const RANGER_RANGE_BONUS_TILES = [0, 0.15, 0.30, 0.45, 0.60] as const;
+export const BALANCE_DAMAGE_BONUS = [0, 0.03, 0.06, 0.09, 0.12] as const;
+export const LAND_DAMAGE_BONUS = [0, 0.05, 0.10, 0.15, 0.20] as const;
+export const AIR_DAMAGE_BONUS = [0, 0.05, 0.10, 0.15, 0.20] as const;
 
 export interface SynergyState {
   classCounts: Record<UnitClass, number>;

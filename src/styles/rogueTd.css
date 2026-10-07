@@ -3073,6 +3073,911 @@ body {
 .unitSpecialEffect i { color: #4ade80; font-style: normal; font-weight: 800; }
 .unitSpecialEffect { margin-top: 9px; padding-top: 7px; border-top: 1px solid #343c49; }
 .unitSpecialEffect > strong { color: #dbeafe; font-size: 11px; }
+
+/* 3성 직업 조합 필살기 컷인 */
+.ultimateCutIn {
+  position: absolute;
+  z-index: 9990;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: all;
+  border-radius: inherit;
+}
+.ultimateShade {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: brightness(0.78) saturate(0.75);
+}
+.ultimatePortraits {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 0 18px rgba(255, 255, 255, 0.18));
+}
+.ultimatePortrait {
+  position: absolute;
+  width: 31%;
+  height: 42%;
+  overflow: hidden;
+  border: 3px solid currentColor;
+  background: #090b10;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.8), 0 0 28px currentColor;
+  transform: skewX(-12deg);
+  animation: ultimatePortraitEnter 900ms cubic-bezier(.18,.8,.2,1) both;
+}
+.ultimatePortrait i {
+  position: absolute;
+  inset: -45% -18% -80%;
+  display: block;
+  background-repeat: no-repeat;
+  background-position: center 24%;
+  background-size: 145%;
+  transform: skewX(12deg) scale(1.15);
+  filter: contrast(1.08) saturate(1.08);
+}
+.ultimatePortrait i.thunderMagicianPortrait {
+  background-position: center 48%;
+  background-size: 138%;
+}
+.ultimatePortrait.portrait1 { left: 3%; bottom: 4%; animation-delay: 80ms; }
+.ultimatePortrait.portrait2 { left: 50%; top: 3%; transform: translateX(-50%) skewX(-12deg); animation-delay: 0ms; }
+.ultimatePortrait.portrait3 { right: 3%; bottom: 4%; animation-delay: 160ms; }
+.ultimateCutIn.warrior { color: #ef4444; }
+.ultimateCutIn.mage { color: #a855f7; }
+.ultimateCutIn.ranger { color: #38bdf8; }
+.ultimateCutIn.impact .ultimatePortraits { display: none; }
+.ultimateMapEffect {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 47%;
+  width: 92%;
+  height: 92%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.ultimateCutIn.warrior .ultimateMapEffect {
+  top: 50%;
+  width: 100%;
+  height: 100%;
+}
+.ultimateCutIn.mage .ultimateMapEffect {
+  top: 50%;
+  width: 100%;
+  height: 100%;
+}
+.ultimateCutIn.impact .ultimateMapEffect { opacity: 1; }
+.ultimateWarriorSlashField { position: absolute; inset: 0; }
+.ultimateWarriorSlash {
+  position: absolute;
+  left: var(--slash-x);
+  top: var(--slash-y);
+  width: var(--slash-width);
+  aspect-ratio: 384 / 320;
+  opacity: 0;
+  background-position: 0 center;
+  background-size: 600% 100%;
+  background-repeat: no-repeat;
+  transform-origin: 50% 50%;
+  transform: translate(-50%, -50%) rotate(var(--slash-rotation)) scaleX(var(--slash-flip));
+  filter: brightness(1.15) drop-shadow(0 0 5px currentColor) drop-shadow(0 0 11px currentColor);
+}
+.ultimateWarriorSlash.swordsman {
+  color: #3b82f6;
+  background-image: url("../images/warrior-ultimate-swordsman-slash.png");
+}
+.ultimateWarriorSlash.dual {
+  color: #ef2929;
+  background-image: url("../images/warrior-ultimate-dual-slash.png");
+}
+.ultimateWarriorSlash.magic {
+  color: #a855f7;
+  background-image: url("../images/warrior-ultimate-magic-slash.png");
+}
+.ultimateCutIn.impact .ultimateWarriorSlash {
+  animation:
+    ultimateWarriorSlashSprite 620ms var(--slash-delay) steps(5, end) both,
+    ultimateWarriorSlashLife 620ms var(--slash-delay) ease-out both;
+}
+.ultimateWarriorScar {
+  position: absolute;
+  left: var(--slash-x);
+  top: var(--slash-y);
+  width: var(--scar-width);
+  height: 6px;
+  opacity: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: linear-gradient(90deg, transparent, currentColor 12% 88%, transparent);
+  clip-path: polygon(0 44%, 22% 25%, 39% 57%, 57% 31%, 76% 63%, 100% 45%, 100% 58%, 77% 77%, 58% 48%, 40% 73%, 21% 43%, 0 62%);
+  transform: translate(-50%, -50%) rotate(var(--slash-rotation));
+  filter: drop-shadow(0 0 5px currentColor) drop-shadow(0 0 12px currentColor);
+}
+.ultimateWarriorScar.swordsman { color: #60a5fa; }
+.ultimateWarriorScar.dual { color: #f87171; }
+.ultimateWarriorScar.magic { color: #c084fc; }
+.ultimateCutIn.impact .ultimateWarriorScar {
+  animation: ultimateWarriorScar 650ms var(--scar-delay) ease-out both;
+}
+.ultimateWarriorImpactBurst {
+  position: absolute;
+  left: var(--slash-x);
+  top: var(--slash-y);
+  width: var(--burst-size);
+  aspect-ratio: 1;
+  opacity: 0;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from var(--burst-rotation), currentColor 0 2deg, transparent 3deg 22deg),
+    radial-gradient(circle, rgba(255,255,255,.9) 0 4%, currentColor 5% 12%, transparent 27%);
+  box-shadow: 0 0 7px #fff, 0 0 16px currentColor, inset 0 0 13px currentColor;
+  transform: translate(-50%, -50%) scale(.12) rotate(var(--burst-rotation));
+  font-style: normal;
+}
+.ultimateWarriorImpactBurst::before,
+.ultimateWarriorImpactBurst::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -48%;
+  width: 3px;
+  height: 196%;
+  border-radius: 50%;
+  background: linear-gradient(transparent, #fff 38% 62%, transparent);
+  box-shadow: 0 0 7px currentColor;
+  transform: translateX(-50%);
+}
+.ultimateWarriorImpactBurst::after { transform: translateX(-50%) rotate(90deg); }
+.ultimateWarriorImpactBurst.swordsman { color: #60a5fa; }
+.ultimateWarriorImpactBurst.dual { color: #ef4444; }
+.ultimateWarriorImpactBurst.magic { color: #a855f7; }
+.ultimateCutIn.impact .ultimateWarriorImpactBurst {
+  animation: ultimateWarriorImpactBurst 440ms var(--burst-delay) cubic-bezier(.12,.68,.2,1) both;
+}
+.ultimateWarriorFaultShade {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  opacity: 0;
+  background: #000;
+  pointer-events: none;
+}
+.ultimateCutIn.impact .ultimateWarriorFaultShade {
+  animation: ultimateWarriorFaultShade 1700ms 2260ms linear both;
+}
+.ultimateWarriorFinalSlash {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  top: 50%;
+  width: 145%;
+  height: 6px;
+  opacity: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent 0%, #fff 9% 91%, transparent 100%);
+  box-shadow: 0 0 5px #fff, 0 0 13px #fff, 0 0 28px rgba(255, 255, 255, .95);
+  clip-path: inset(0 100% 0 0);
+  transform: translate(-50%, -50%) rotate(-19.5deg);
+}
+.ultimateCutIn.impact .ultimateWarriorFinalSlash {
+  animation: ultimateWarriorFinalSlash 360ms 2470ms cubic-bezier(.12,.78,.16,1) both;
+}
+.ultimateWarriorSplit {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  opacity: 0;
+  background: #fff;
+  filter: drop-shadow(0 0 10px #fff);
+}
+.ultimateWarriorSplit.upper { clip-path: polygon(0 100%, 0 0, 100% 0); }
+.ultimateWarriorSplit.lower { clip-path: polygon(0 100%, 100% 100%, 100% 0); }
+.ultimateCutIn.impact .ultimateWarriorSplit.upper {
+  animation: ultimateWarriorSplitUpper 720ms 2910ms ease-out both;
+}
+.ultimateCutIn.impact .ultimateWarriorSplit.lower {
+  animation: ultimateWarriorSplitLower 720ms 2910ms ease-out both;
+}
+.ultimateWarriorRift {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 50%;
+  width: 145%;
+  height: 3px;
+  opacity: 0;
+  background: transparent;
+  transform: translate(-50%, -50%) rotate(-19.5deg);
+}
+.ultimateWarriorRift::before,
+.ultimateWarriorRift::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  height: 3px;
+  background: #fff;
+  box-shadow: 0 0 7px #fff, 0 0 18px #fff;
+  transition: none;
+}
+.ultimateWarriorRift::before { animation: ultimateWarriorLineSplitUpper 720ms 2910ms ease-out both; }
+.ultimateWarriorRift::after { animation: ultimateWarriorLineSplitLower 720ms 2910ms ease-out both; }
+.ultimateCutIn.impact .ultimateWarriorRift {
+  animation: ultimateWarriorRift 1120ms 2670ms linear both;
+}
+.ultimateMageCircle {
+  position: absolute;
+  z-index: 2;
+  width: 29.4%;
+  aspect-ratio: 2 / 1;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+.ultimateMageCircle.fire { left: 18%; top: 77%; color: #ef4444; }
+.ultimateMageCircle.ice { left: 50%; top: 27%; color: #38bdf8; }
+.ultimateMageCircle.lightning { left: 82%; top: 80%; color: #facc15; }
+.ultimateMageCircle i {
+  position: absolute;
+  inset: 0;
+  background-position: 0 center;
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 18px currentColor);
+}
+.ultimateMageCircle.fire i { background-image: url("../images/mage-ultimate-fire-circle.png"); }
+.ultimateMageCircle.ice i { background-image: url("../images/mage-ultimate-ice-circle.png"); }
+.ultimateMageCircle.lightning i { background-image: url("../images/mage-ultimate-lightning-circle.png"); }
+.ultimateCutIn.impact .ultimateMageCircle {
+  animation: ultimateMageCircleLife 4500ms linear both;
+}
+.ultimateCutIn.impact .ultimateMageCircle i {
+  animation: ultimateMageCircleSprite 250ms steps(3, end) both;
+}
+.ultimateMageCrystalField {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ultimateMageCrystal {
+  opacity: 0;
+  fill: currentColor;
+  stroke: rgba(255,255,255,.88);
+  stroke-width: .1;
+  paint-order: stroke fill;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ultimateMageCrystalTrail {
+  fill: none;
+  opacity: 0;
+  stroke: currentColor;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.ultimateMageCrystalTrail.fire { color: rgba(255,74,48,.72); }
+.ultimateMageCrystalTrail.ice { color: rgba(115,224,255,.72); }
+.ultimateMageCrystalTrail.lightning { color: rgba(255,216,74,.75); }
+.ultimateMageCrystalGlint {
+  opacity: 0;
+  stroke: rgba(255,255,255,.92);
+  stroke-width: .11;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.ultimateMageCrystal.fire {
+  color: #ff593f;
+  filter: drop-shadow(0 0 4px #ff2d1f);
+}
+.ultimateMageCrystal.ice {
+  color: #8cecff;
+  filter: drop-shadow(0 0 4px #38bdf8);
+}
+.ultimateMageCrystal.lightning {
+  color: #ffd84a;
+  filter: drop-shadow(0 0 4px #f59e0b);
+}
+.ultimateCutIn.impact .ultimateMageCrystal {
+  animation: ultimateMageCrystalSpiral var(--crystal-duration) var(--crystal-delay) cubic-bezier(.32, .04, .28, 1) both;
+}
+.ultimateCutIn.impact .ultimateMageCrystalGlint {
+  animation: ultimateMageCrystalSpiral var(--crystal-duration) var(--crystal-delay) cubic-bezier(.32, .04, .28, 1) both;
+}
+.ultimateMageCore {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 50%;
+  width: 18%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.08);
+  background: radial-gradient(circle at 42% 38%, rgba(255,255,255,.78), rgba(255,255,255,.22) 38%, rgba(255,255,255,.08) 66%, transparent 74%);
+  border: 1px solid rgba(255,255,255,.68);
+  box-shadow: inset 0 0 18px rgba(255,255,255,.52), 0 0 16px rgba(255,255,255,.72), 0 0 36px rgba(216,235,255,.4);
+}
+.ultimateCutIn.impact .ultimateMageCore {
+  animation:
+    ultimateMageCoreGather 3500ms 250ms linear both,
+    ultimateMageCoreDetonate 850ms 4550ms ease-out forwards;
+}
+.ultimateMageAbsorptions {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  pointer-events: none;
+}
+.ultimateMageAbsorptions i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(7% * var(--absorb-size));
+  aspect-ratio: 1;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.15);
+}
+.ultimateMageAbsorptions i.fire { color: #ff6048; box-shadow: 0 0 8px #ff2d1f, inset 0 0 5px #fff; }
+.ultimateMageAbsorptions i.ice { color: #8cecff; box-shadow: 0 0 8px #38bdf8, inset 0 0 5px #fff; }
+.ultimateMageAbsorptions i.lightning { color: #ffd84a; box-shadow: 0 0 9px #f59e0b, inset 0 0 5px #fff; }
+.ultimateCutIn.impact .ultimateMageAbsorptions i {
+  animation: ultimateMageAbsorbPulse 310ms var(--absorb-delay) ease-out both;
+}
+.ultimateMageBigBang {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: 50%;
+  width: 13%;
+  aspect-ratio: 1;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.05);
+  pointer-events: none;
+}
+.ultimateMageBigBang::before,
+.ultimateMageBigBang::after,
+.ultimateMageBigBang i {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+.ultimateMageBigBang::before {
+  background: radial-gradient(circle, #fff 0 23%, rgba(255,255,255,.96) 34%, rgba(202,230,255,.55) 57%, transparent 74%);
+  box-shadow: 0 0 18px #fff, 0 0 48px rgba(219,238,255,.95), 0 0 90px rgba(180,215,255,.72);
+}
+.ultimateMageBigBang::after {
+  inset: -120%;
+  background: repeating-conic-gradient(from 7deg, rgba(255,255,255,.95) 0deg 1.5deg, transparent 2.5deg 11deg);
+  mask-image: radial-gradient(circle, #000 0 9%, transparent 66%);
+  opacity: .9;
+}
+.ultimateMageBigBang i {
+  inset: -20%;
+  border: 3px solid rgba(255,255,255,.95);
+  box-shadow: 0 0 12px #fff, inset 0 0 12px #fff;
+}
+.ultimateCutIn.impact .ultimateMageBigBang {
+  animation: ultimateMageBigBang 1050ms 4550ms cubic-bezier(.12,.72,.18,1) both;
+}
+.ultimateCutIn.impact .ultimateMageBigBang i {
+  animation: ultimateMageBigBangWave 900ms 4580ms ease-out both;
+}
+.ultimateMageConvergence { position: absolute; z-index: 3; inset: 0; }
+.ultimateMageConvergence i {
+  position: absolute;
+  height: 5px;
+  opacity: 0;
+  border-radius: 999px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, transparent, currentColor 18%, #fff 78%, transparent);
+  box-shadow: 0 0 7px currentColor, 0 0 18px currentColor;
+}
+.ultimateMageConvergence i.fire { left: 18%; top: 72%; width: 36%; color: #ef4444; transform: rotate(-15deg); }
+.ultimateMageConvergence i.ice { left: 50%; top: 27%; width: 23%; color: #38bdf8; transform: rotate(90deg); }
+.ultimateMageConvergence i.lightning { left: 82%; top: 72%; width: 36%; color: #facc15; transform: rotate(-165deg); }
+.ultimateCutIn.impact .ultimateMageConvergence i {
+  animation: ultimateMageConverge 950ms 570ms ease-in both;
+}
+.ultimateMageFusionBurst {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 50%;
+  width: 58%;
+  aspect-ratio: 1;
+  opacity: 0;
+  background: url("../images/mage-ultimate-fusion-burst.png") 0 center / 800% 100% no-repeat;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 10px #fff) drop-shadow(0 0 28px #a855f7);
+}
+.ultimateCutIn.impact .ultimateMageFusionBurst {
+  animation:
+    ultimateMageFusionSprite 1850ms 950ms steps(7, end) both,
+    ultimateMageFusionLife 1850ms 950ms ease-in-out both;
+}
+.ultimateRangerScope {
+  position: absolute;
+  z-index: 7;
+  left: 92%;
+  top: 22%;
+  width: 23%;
+  aspect-ratio: 1;
+  border: 2px solid rgba(5,8,12,.96);
+  outline: 1px solid rgba(15,23,32,.62);
+  outline-offset: 5px;
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 150vmax rgba(3,7,18,.72),
+    0 0 3px rgba(255,255,255,.6),
+    0 0 12px rgba(0,0,0,.72),
+    inset 0 0 16px rgba(0,0,0,.28);
+  pointer-events: none;
+}
+.ultimateRangerScope::before,
+.ultimateRangerScope::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: linear-gradient(90deg, transparent 0 7%, rgba(0,0,0,.92) 8% 42%, transparent 43% 57%, rgba(0,0,0,.92) 58% 92%, transparent 93%);
+  box-shadow: 0 0 2px rgba(255,255,255,.72);
+}
+.ultimateRangerScope::before { width: 145%; height: 1px; transform: translate(-50%, -50%); }
+.ultimateRangerScope::after {
+  width: 1px;
+  height: 145%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(180deg, transparent 0 7%, rgba(0,0,0,.92) 8% 42%, transparent 43% 57%, rgba(0,0,0,.92) 58% 92%, transparent 93%);
+}
+.ultimateRangerScope i {
+  position: absolute;
+  inset: 13%;
+  border: 1px dashed rgba(8,12,18,.82);
+  border-radius: 50%;
+  box-shadow: inset 0 0 10px rgba(0,0,0,.22);
+  animation: ultimateRangerScopeDial 850ms linear infinite;
+}
+.ultimateRangerScope b {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 2px;
+  background: #ef233c;
+  box-shadow: 0 0 3px #fff, 0 0 9px rgba(239,35,60,.95);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.ultimateRangerScope em {
+  position: absolute;
+  inset: -7%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(0,0,0,.92) 0 2deg, transparent 2deg 15deg);
+  mask: radial-gradient(circle, transparent 0 76%, #000 77% 82%, transparent 83%);
+  animation: ultimateRangerScopeDial 1800ms linear infinite reverse;
+}
+.ultimateRangerScope small {
+  position: absolute;
+  color: rgba(3,7,12,.96);
+  font-family: Consolas, "Courier New", monospace;
+  font-size: clamp(6px, .72vw, 10px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: .08em;
+  white-space: nowrap;
+  text-shadow: 0 0 2px rgba(255,255,255,.82);
+}
+.ultimateRangerScope small.range {
+  left: 50%;
+  top: 18%;
+  padding: 3px 5px;
+  border: 1px solid rgba(0,0,0,.72);
+  background: rgba(255,255,255,.24);
+  transform: translateX(-50%);
+}
+.ultimateRangerScope small.azimuth { left: 12%; top: 34%; }
+.ultimateRangerScope small.wind { right: 10%; top: 34%; }
+.ultimateRangerScope small.lock {
+  left: 50%;
+  bottom: 14%;
+  color: #05070a;
+  transform: translateX(-50%);
+  animation: ultimateRangerScopeReadout 520ms steps(2, end) infinite;
+}
+.ultimateRangerScope small.lock::before {
+  content: "[ ";
+  color: #05070a;
+}
+.ultimateRangerScope small.lock::after {
+  content: " ]";
+  color: #05070a;
+}
+.ultimateRangerScope i::before,
+.ultimateRangerScope i::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 38%;
+  height: 12%;
+  border-left: 1px solid rgba(0,0,0,.78);
+  border-right: 1px solid rgba(0,0,0,.78);
+  background: repeating-linear-gradient(90deg, rgba(0,0,0,.76) 0 1px, transparent 1px 12%);
+  transform: translateX(-50%);
+}
+.ultimateRangerScope i::before { top: 24%; border-top: 1px solid rgba(0,0,0,.58); }
+.ultimateRangerScope i::after { bottom: 24%; border-bottom: 1px solid rgba(0,0,0,.58); }
+.ultimateCutIn.impact .ultimateRangerScope {
+  animation: ultimateRangerScopeSearch 2450ms ease-in-out both;
+}
+.ultimateTargetField { position: absolute; z-index: 2; inset: 0; }
+.ultimateTarget {
+  position: absolute;
+  left: var(--target-x);
+  top: var(--target-y);
+  width: var(--target-width);
+  aspect-ratio: 16 / 9;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+}
+.ultimateTargetSprite {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: url("../images/ranger-ultimate-target-sprite.png") 0 center / 800% 100% no-repeat;
+  filter: drop-shadow(0 0 7px rgba(255, 26, 34, .75));
+}
+.ultimateCutIn.impact .ultimateTarget {
+  animation: ultimateTargetSpriteLife var(--target-life) calc(2500ms + var(--target-delay)) ease-in-out both;
+}
+.ultimateCutIn.impact .ultimateTargetSprite {
+  animation: ultimateTargetSpritePlay 500ms calc(2500ms + var(--target-delay)) steps(7, end) both;
+}
+.ultimateMissiles { position: absolute; inset: 0; }
+.ultimateMissiles i {
+  position: absolute;
+  left: var(--strike-x);
+  top: var(--strike-y);
+  width: var(--missile-width);
+  height: auto;
+  aspect-ratio: 1 / 2;
+  background: url("../images/ranger-ultimate-missile-sprite.png") 0 center / 600% 100% no-repeat;
+  filter:
+    drop-shadow(0 0 4px rgba(255, 255, 255, .96))
+    drop-shadow(0 0 10px rgba(255, 184, 48, .94))
+    drop-shadow(0 0 19px rgba(255, 68, 12, .82));
+}
+.ultimateCutIn.impact .ultimateMissiles i {
+  animation:
+    ultimateMissileGlowPulse 260ms ease-in-out infinite alternate,
+    ultimateMissileDrop 650ms var(--missile-delay) cubic-bezier(.3,.05,.72,.42) both;
+}
+.ultimateBombardmentBursts { position: absolute; inset: 0; }
+.ultimateBombardmentBursts b {
+  position: absolute;
+  left: var(--target-x);
+  top: var(--target-y);
+  width: var(--explosion-width);
+  aspect-ratio: 4 / 3;
+  background: url("../images/ranger-ultimate-explosion-sprite.png") 0 center / 1000% 100% no-repeat;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 12px rgba(255, 78, 12, .82));
+}
+.ultimateCutIn.impact .ultimateBombardmentBursts b {
+  animation:
+    ultimateExplosionSpritePlay 950ms var(--burst-delay) steps(9, end) both,
+    ultimateExplosionSpriteLife 950ms var(--burst-delay) linear both;
+}
+.ultimateFlash {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  opacity: 0;
+  background: #fff;
+  pointer-events: none;
+}
+.ultimateCutIn.impact .ultimateFlash { animation: ultimateScreenFlash 1200ms ease-out both; }
+.gamePage.ultimate-impact .board { animation: ultimateBoardShake 1100ms linear both; }
+.ultimateCutIn.ranger.impact .ultimateFlash { animation-delay: 4330ms; }
+.gamePage.ultimate-impact.ultimate-ranger .boardShell {
+  animation: ultimateRangerBombardmentShake 1550ms 4230ms linear both;
+}
+.ultimateCutIn.warrior.impact .ultimateFlash { animation: ultimateWarriorRestoreFlash 650ms 3580ms ease-out both; }
+.ultimateCutIn.mage.impact .ultimateFlash { animation: ultimateMageBigBangFlash 950ms 4550ms ease-out both; }
+.gamePage.ultimate-impact.ultimate-mage .boardShell { animation: ultimateMageBigBangShake 900ms 4550ms linear both; }
+.gamePage.ultimate-impact.ultimate-warrior .board { animation: ultimateWarriorBarrageShake 2020ms linear both; }
+
+@keyframes ultimatePortraitEnter {
+  from { opacity: 0; translate: 0 45px; scale: .86; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+@keyframes ultimateCutInExit { to { opacity: 0; filter: blur(8px); } }
+@keyframes ultimateWarriorSlashSprite {
+  from { background-position-x: 0%; }
+  to { background-position-x: 100%; }
+}
+@keyframes ultimateWarriorSlashLife {
+  0% { opacity: 0; }
+  8%, 76% { opacity: 1; }
+  100% { opacity: 0; filter: brightness(1.7) drop-shadow(0 0 12px currentColor); }
+}
+@keyframes ultimateWarriorScar {
+  0% { opacity: 0; scale: .72 1; }
+  8%, 62% { opacity: 1; scale: 1 1; }
+  100% { opacity: 0; scale: 1.08 .35; }
+}
+@keyframes ultimateWarriorImpactBurst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.12) rotate(var(--burst-rotation)); }
+  12% { opacity: 1; }
+  58% { opacity: .95; transform: translate(-50%, -50%) scale(1) rotate(calc(var(--burst-rotation) + 18deg)); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.48) rotate(calc(var(--burst-rotation) + 32deg)); }
+}
+@keyframes ultimateWarriorBarrageShake {
+  0%, 11%, 15%, 29%, 33%, 48%, 52%, 67%, 71%, 85%, 89%, 100% { transform: translate(0); }
+  12% { transform: translate(-5px, 3px); }
+  13% { transform: translate(5px, -3px); }
+  30% { transform: translate(5px, 3px); }
+  31% { transform: translate(-5px, -3px); }
+  49% { transform: translate(-6px, 3px); }
+  50% { transform: translate(5px, -3px); }
+  68% { transform: translate(5px, 4px); }
+  69% { transform: translate(-5px, -3px); }
+  86% { transform: translate(-6px, 0); }
+  87% { transform: translate(6px, 3px); }
+}
+@keyframes ultimateRangerBombardmentShake {
+  0%, 100% { transform: translate(0); }
+  4% { transform: translate(-3px, 2px); }
+  8% { transform: translate(3px, -2px); }
+  12% { transform: translate(-1px, 1px); }
+  16% { transform: translate(0); }
+  22% { transform: translate(3px, 2px); }
+  27% { transform: translate(-2px, -2px); }
+  32% { transform: translate(1px, 1px); }
+  37% { transform: translate(0); }
+  43% { transform: translate(-3px, 1px); }
+  48% { transform: translate(2px, -2px); }
+  53% { transform: translate(-1px, 1px); }
+  58% { transform: translate(0); }
+  64% { transform: translate(3px, -1px); }
+  69% { transform: translate(-2px, 2px); }
+  74% { transform: translate(1px, -1px); }
+  79% { transform: translate(0); }
+  85% { transform: translate(-2px, -1px); }
+  89% { transform: translate(2px, 1px); }
+  93% { transform: translate(-1px, 0); }
+  96% { transform: translate(1px, 0); }
+}
+@keyframes ultimateWarriorFinalSlash {
+  0% { opacity: 0; clip-path: inset(0 100% 0 0); }
+  8% { opacity: 1; }
+  72% { opacity: 1; clip-path: inset(0 0 0 0); }
+  100% { opacity: 0; clip-path: inset(0 0 0 0); }
+}
+@keyframes ultimateWarriorFaultShade {
+  0% { opacity: 0; }
+  1%, 14% { opacity: .3; }
+  30%, 82% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes ultimateWarriorSplitUpper {
+  0% { opacity: 0; transform: translate(0, 0); }
+  82% { opacity: 1; transform: translate(-18px, -34px); }
+  100% { opacity: 0; transform: translate(-18px, -34px); }
+}
+@keyframes ultimateWarriorSplitLower {
+  0% { opacity: 0; transform: translate(0, 0); }
+  82% { opacity: 1; transform: translate(18px, 34px); }
+  100% { opacity: 0; transform: translate(18px, 34px); }
+}
+@keyframes ultimateWarriorRift {
+  0% { opacity: 0; }
+  1%, 78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes ultimateWarriorLineSplitUpper {
+  0% { opacity: 1; transform: translateY(0); }
+  82% { opacity: 1; transform: translateY(-36px); }
+  100% { opacity: 0; transform: translateY(-36px); }
+}
+@keyframes ultimateWarriorLineSplitLower {
+  0% { opacity: 1; transform: translateY(0); }
+  82% { opacity: 1; transform: translateY(36px); }
+  100% { opacity: 0; transform: translateY(36px); }
+}
+@keyframes ultimateWarriorRestoreFlash {
+  0% { opacity: 0; }
+  18% { opacity: 1; }
+  45% { opacity: .96; }
+  100% { opacity: 0; }
+}
+@keyframes ultimateMageCircleSprite { from { background-position-x: 0%; } to { background-position-x: 100%; } }
+@keyframes ultimateMageCircleLife {
+  0% { opacity: 0; }
+  4%, 96% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes ultimateMageCrystalSpiral {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  72% {
+    opacity: .96;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ultimateMageCoreGather {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.06); }
+  8%, 38% { opacity: .28; transform: translate(-50%, -50%) scale(.1); }
+  48% { opacity: .42; transform: translate(-50%, -50%) scale(.25); }
+  58% { opacity: .54; transform: translate(-50%, -50%) scale(.4); }
+  68% { opacity: .65; transform: translate(-50%, -50%) scale(.55); }
+  78% { opacity: .75; transform: translate(-50%, -50%) scale(.7); }
+  88% { opacity: .85; transform: translate(-50%, -50%) scale(.84); }
+  100% { opacity: .96; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes ultimateMageCoreDetonate {
+  0% { opacity: .96; transform: translate(-50%, -50%) scale(1); filter: brightness(1); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); filter: brightness(2.4); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(2); filter: brightness(3); }
+}
+@keyframes ultimateMageAbsorbPulse {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.12); filter: brightness(2.4); }
+  28% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); filter: brightness(1); }
+}
+@keyframes ultimateMageBigBang {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.05); }
+  9% { opacity: 1; }
+  45% { opacity: 1; transform: translate(-50%, -50%) scale(3.2); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(8.5); }
+}
+@keyframes ultimateMageBigBangWave {
+  0% { opacity: 0; transform: scale(.15); border-width: 5px; }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: scale(6.5); border-width: 1px; }
+}
+@keyframes ultimateMageBigBangFlash {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  19% { opacity: .16; }
+  31% { opacity: .92; }
+  48% { opacity: .3; }
+  100% { opacity: 0; }
+}
+@keyframes ultimateMageBigBangShake {
+  0%, 100% { transform: translate(0); }
+  8% { transform: translate(-5px, 3px); }
+  16% { transform: translate(5px, -4px); }
+  25% { transform: translate(-4px, -2px); }
+  36% { transform: translate(4px, 3px); }
+  49% { transform: translate(-3px, 2px); }
+  63% { transform: translate(3px, -2px); }
+  78% { transform: translate(-1px, 1px); }
+}
+@keyframes ultimateMageConverge {
+  0% { opacity: 0; scale: .04 1; }
+  20%, 72% { opacity: 1; scale: 1 1; }
+  100% { opacity: 0; scale: 1 .2; }
+}
+@keyframes ultimateMageFusionSprite { from { background-position-x: 0%; } to { background-position-x: 100%; } }
+@keyframes ultimateMageFusionLife {
+  0% { opacity: 0; scale: .65; }
+  8%, 86% { opacity: 1; }
+  100% { opacity: 0; scale: 1.08; }
+}
+@keyframes ultimateMageFlash {
+  0%, 12% { opacity: 0; }
+  22% { opacity: .85; }
+  39% { opacity: .08; }
+  58% { opacity: .48; }
+  100% { opacity: 0; }
+}
+@keyframes ultimateMageImpactShake {
+  0%, 100% { transform: translate(0); }
+  12% { transform: translate(-4px, 2px); }
+  25% { transform: translate(4px, -3px); }
+  40% { transform: translate(-3px, -2px); }
+  56% { transform: translate(3px, 2px); }
+  72% { transform: translate(-2px, 1px); }
+  86% { transform: translate(1px, -1px); }
+}
+@keyframes ultimateTargetSpriteLife {
+  0% { opacity: 0; transform: translate(-50%, -50%); }
+  4% { opacity: .9; }
+  9% { opacity: 1; transform: translate(-50%, -50%); }
+  82% { opacity: 1; filter: brightness(1); }
+  89% { opacity: .75; filter: brightness(1.7); }
+  94% { opacity: 1; filter: brightness(2.1); }
+  100% { opacity: 0; transform: translate(-50%, -50%); filter: brightness(1); }
+}
+@keyframes ultimateTargetSpritePlay {
+  from { background-position-x: 0%; }
+  to { background-position-x: 100%; }
+}
+@keyframes ultimateRangerScopeSearch {
+  0% { left: 88%; top: 18%; opacity: 0; transform: translate(-50%, -50%) scale(.84); }
+  6% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  20% { left: 14%; top: 24%; }
+  36% { left: 74%; top: 38%; }
+  51% { left: 24%; top: 72%; }
+  66% { left: 86%; top: 76%; }
+  79% { left: 12%; top: 48%; }
+  88%, 94% { left: 50%; top: 50%; opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { left: 50%; top: 50%; opacity: 0; transform: translate(-50%, -50%) scale(.92); }
+}
+@keyframes ultimateRangerScopeDial {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes ultimateRangerScopeReadout {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: .55; }
+}
+@keyframes ultimateMissileDrop {
+  0% { opacity: 0; transform: translate(-50%, -245%) rotate(0deg); }
+  8% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -96%) rotate(0deg); }
+}
+@keyframes ultimateMissileSpritePlay {
+  from { background-position-x: 0%; }
+  to { background-position-x: 100%; }
+}
+@keyframes ultimateMissileGlowPulse {
+  from {
+    filter:
+      drop-shadow(0 0 3px rgba(255, 255, 255, .86))
+      drop-shadow(0 0 8px rgba(255, 184, 48, .82))
+      drop-shadow(0 0 15px rgba(255, 68, 12, .72));
+  }
+  to {
+    filter:
+      drop-shadow(0 0 6px rgba(255, 255, 255, 1))
+      drop-shadow(0 0 14px rgba(255, 184, 48, 1))
+      drop-shadow(0 0 24px rgba(255, 68, 12, .92));
+  }
+}
+@keyframes ultimateExplosionSpritePlay {
+  from { background-position-x: 0%; }
+  to { background-position-x: 100%; }
+}
+@keyframes ultimateExplosionSpriteLife {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.96); }
+  8%, 78% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes ultimateShockwave { from { opacity: 1; scale: .15; } to { opacity: 0; scale: 8; border-width: 1px; } }
+@keyframes ultimateScreenFlash {
+  0%, 12% { opacity: 0; }
+  24% { opacity: .86; }
+  40% { opacity: .08; }
+  53% { opacity: .62; }
+  100% { opacity: 0; }
+}
+@keyframes ultimateBoardShake {
+  0%, 100% { transform: translate(0); }
+  12% { transform: translate(-7px, 4px); }
+  24% { transform: translate(8px, -5px); }
+  38% { transform: translate(-6px, -4px); }
+  52% { transform: translate(7px, 5px); }
+  68% { transform: translate(-4px, 2px); }
+  84% { transform: translate(3px, -2px); }
+}
 .unitSpecialEffect p { margin: 4px 0 0; color: #f3f4f6; font-size: 11px; line-height: 1.4; }
 
 .bossDetailPortrait {

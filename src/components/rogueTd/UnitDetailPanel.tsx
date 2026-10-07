@@ -1,5 +1,5 @@
 import {
-  FIRE_BURN_CHANCE,
+  FIRE_AREA_CHANCE,
   ICE_SLOW_CHANCE,
   LIGHTNING_PARALYZE_CHANCE,
   SNIPER_EXECUTE_CHANCE,
@@ -71,7 +71,7 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
   const specTarget = def.specType === "balance" ? "모든 적" : def.specType === "land_spec" ? "육지 적" : "조류 적";
 
   const specialEffect = (() => {
-    if (unit.typeId === "fire_mage") return <>{percent(FIRE_BURN_CHANCE)}<i>{mageBonus > 0 ? ` (+${percent(mageBonus)})` : ""}</i> 확률로 50% 화상 추가 피해</>;
+    if (unit.typeId === "fire_mage") return <>{percent(FIRE_AREA_CHANCE)}<i>{mageBonus > 0 ? ` (+${percent(mageBonus)})` : ""}</i> 확률로 주변 1.5칸 범위 피해</>;
     if (unit.typeId === "ice_mage") return <>{percent(ICE_SLOW_CHANCE)}<i>{mageBonus > 0 ? ` (+${percent(mageBonus)})` : ""}</i> 확률로 주변 적을 1초간 50% 둔화</>;
     if (unit.typeId === "lightning_mage") return <>{percent(LIGHTNING_PARALYZE_CHANCE)}<i>{mageBonus > 0 ? ` (+${percent(mageBonus)})` : ""}</i> 확률로 대상을 1초간 마비</>;
     if (unit.typeId === "sniper") return <>{percent(SNIPER_EXECUTE_CHANCE)} 확률로 일반 적 즉사</>;

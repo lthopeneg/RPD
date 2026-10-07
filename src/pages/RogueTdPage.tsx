@@ -12,6 +12,7 @@ import DamageReport from "../components/rogueTd/DamageReport";
 import type { WaveDamageEntry } from "../components/rogueTd/DamageReport";
 import ContextActionMenu from "../components/rogueTd/ContextActionMenu";
 import DebugPanel from "../components/rogueTd/DebugPanel";
+import UltimateCutIn from "../components/rogueTd/UltimateCutIn";
 import type { DebugBrush, DebugStagePreset } from "../components/rogueTd/DebugPanel";
 import { generateMap } from "../games/rogueTd/mapGenerator";
 import { findShortestPath, toRC } from "../games/rogueTd/pathfinding";
@@ -27,7 +28,7 @@ import {
   BOSS_SNIPER_DAMAGE_MULTIPLIER,
   DAMAGE_MULTIPLIERS,
   CELL_COUNT,
-  FIRE_BURN_CHANCE,
+  FIRE_AREA_CHANCE,
   getWaveTimeLimit,
   getBossCategory,
   getBossClearGold,
@@ -127,6 +128,7 @@ import type {
   Projectile,
   StorageUnit,
   Unit,
+  UnitClass,
   UnitTypeId,
 } from "../games/rogueTd/types";
 
@@ -144,6 +146,36 @@ const ALL_UNIT_TYPES: UnitTypeId[] = [
   "sniper",
 ];
 const DEBUG_ACCESS_CODE = "0427";
+const ULTIMATE_FIRST_ROLL_MS = 20000;
+const ULTIMATE_FAIL_COOLDOWN_MS = 15000;
+const ULTIMATE_SUCCESS_COOLDOWN_MS = 60000;
+const ULTIMATE_TRIGGER_CHANCE = 0.25;
+const ULTIMATE_DAMAGE_MULTIPLIER: Record<UnitClass, number> = {
+  warrior: 3,
+  mage: 3,
+  ranger: 1.75,
+};
+const ULTIMATE_UNIT_TYPES: Record<UnitClass, UnitTypeId[]> = {
+  warrior: ["swordsman", "dual_swordsman", "magic_swordsman"],
+  mage: ["fire_mage", "ice_mage", "lightning_mage"],
+  ranger: ["rifleman", "shotgunner", "sniper"],
+};
+interface UltimateContribution {
+  unitId: number;
+  typeId: UnitTypeId;
+  damage: number;
+}
+interface UltimateJob {
+  unitClass: UnitClass;
+  unitTypeIds: UnitTypeId[];
+  contributions: UltimateContribution[];
+  previewOnly?: boolean;
+}
+interface UltimateSequence {
+  job: UltimateJob;
+  phase: "cutin" | "impact";
+  token: number;
+}
 
 const getDebugPresetStage = (preset: DebugStagePreset) => {
   if (preset === "normal-human") return 1;
@@ -239,10 +271,67 @@ export default function RogueTdPage() {
   const nextLog = useRef(2);
   const waveDamageRef = useRef<Record<number, number>>({});
   const waveUnitsRef = useRef<Unit[]>([]);
+  const [ultimateSequence, setUltimateSequence] = useState<UltimateSequence | null>(null);
+  const ultimateActiveRef = useRef(false);
+  const ultimateQueueRef = useRef<UltimateJob[]>([]);
+  const pendingUltimateHitsRef = useRef<UltimateJob[]>([]);
+  const ultimateSequenceToken = useRef(0);
+  const ultimateNextRollAtRef = useRef<Record<UnitClass, number>>({
+    warrior: Number.POSITIVE_INFINITY,
+    mage: Number.POSITIVE_INFINITY,
+    ranger: Number.POSITIVE_INFINITY,
+  });
+
+  const enqueueUltimate = useCallback((job: UltimateJob) => {
+    if (ultimateActiveRef.current) {
+      ultimateQueueRef.current.push(job);
+      return;
+    }
+    ultimateActiveRef.current = true;
+    ultimateSequenceToken.current += 1;
+    setUltimateSequence({ job, phase: "cutin", token: ultimateSequenceToken.current });
+  }, []);
+
+  useEffect(() => {
+    if (!ultimateSequence) return;
+    if (ultimateSequence.phase === "cutin") {
+      const timeout = window.setTimeout(() => {
+        if (!ultimateSequence.job.previewOnly) pendingUltimateHitsRef.current.push(ultimateSequence.job);
+        setUltimateSequence({ ...ultimateSequence, phase: "impact" });
+      }, 2200);
+      return () => window.clearTimeout(timeout);
+    }
+
+    const timeout = window.setTimeout(() => {
+      const nextJob = ultimateQueueRef.current.shift();
+      if (nextJob) {
+        ultimateSequenceToken.current += 1;
+        setUltimateSequence({ job: nextJob, phase: "cutin", token: ultimateSequenceToken.current });
+      } else {
+        ultimateActiveRef.current = false;
+        setUltimateSequence(null);
+        lastFrame.current = performance.now();
+      }
+    }, ultimateSequence.job.unitClass === "ranger"
+      ? 6000
+      : ultimateSequence.job.unitClass === "warrior"
+        ? 4250
+        : 5700);
+    return () => window.clearTimeout(timeout);
+  }, [ultimateSequence]);
 
   const triggerBossWarning = (stage: number) => {
     bossWarningSequence.current += 1;
     setBossWarning({ stage, token: bossWarningSequence.current });
+  };
+
+  const handleDebugPreviewUltimate = (unitClass: UnitClass) => {
+    enqueueUltimate({
+      unitClass,
+      unitTypeIds: ULTIMATE_UNIT_TYPES[unitClass],
+      contributions: [],
+      previewOnly: true,
+    });
   };
 
   useEffect(() => {
@@ -408,6 +497,15 @@ export default function RogueTdPage() {
     setGameSpeed(1);
     gameTimeMs.current = 0;
     boardShakeUntilMs.current = 0;
+    ultimateActiveRef.current = false;
+    ultimateQueueRef.current = [];
+    pendingUltimateHitsRef.current = [];
+    setUltimateSequence(null);
+    ultimateNextRollAtRef.current = {
+      warrior: Number.POSITIVE_INFINITY,
+      mage: Number.POSITIVE_INFINITY,
+      ranger: Number.POSITIVE_INFINITY,
+    };
     waveTimeRemainingMs.current = WAVE_TIME_LIMIT_SEC * 1000;
     lastSpawnGameMs.current = 0;
     setGameResult("playing");
@@ -617,6 +715,10 @@ export default function RogueTdPage() {
     setRunning(false);
     setPaused(false);
     pausedRef.current = false;
+    ultimateActiveRef.current = false;
+    ultimateQueueRef.current = [];
+    pendingUltimateHitsRef.current = [];
+    setUltimateSequence(null);
     setToSpawn(0);
     setMonsters([]);
     setProjectiles([]);
@@ -712,6 +814,11 @@ export default function RogueTdPage() {
     setGameResult("playing");
     setShowStageBossInfo(false);
     gameTimeMs.current = 0;
+    ultimateNextRollAtRef.current = {
+      warrior: ULTIMATE_FIRST_ROLL_MS,
+      mage: ULTIMATE_FIRST_ROLL_MS,
+      ranger: ULTIMATE_FIRST_ROLL_MS,
+    };
     waveTimeRemainingMs.current = timeLimit * 1000;
     setWaveTimeRemainingSec(timeLimit);
     if (isBossWave(stage)) triggerBossWarning(stage);
@@ -792,6 +899,13 @@ export default function RogueTdPage() {
     if (!running) {
       waveDamageRef.current = {};
       waveUnitsRef.current = units.map((unit) => ({ ...unit }));
+      if (!Number.isFinite(ultimateNextRollAtRef.current.warrior)) {
+        ultimateNextRollAtRef.current = {
+          warrior: gameTimeMs.current + ULTIMATE_FIRST_ROLL_MS,
+          mage: gameTimeMs.current + ULTIMATE_FIRST_ROLL_MS,
+          ranger: gameTimeMs.current + ULTIMATE_FIRST_ROLL_MS,
+        };
+      }
       if (waveTimeRemainingMs.current <= 0) {
         waveTimeRemainingMs.current = waveTimeLimit * 1000;
         setWaveTimeRemainingSec(waveTimeLimit);
@@ -1109,6 +1223,15 @@ export default function RogueTdPage() {
     setToSpawn(isBossWave(wave) ? 1 : getWaveMonsterCount(wave));
     gameTimeMs.current = 0;
     boardShakeUntilMs.current = 0;
+    ultimateActiveRef.current = false;
+    ultimateQueueRef.current = [];
+    pendingUltimateHitsRef.current = [];
+    setUltimateSequence(null);
+    ultimateNextRollAtRef.current = {
+      warrior: ULTIMATE_FIRST_ROLL_MS,
+      mage: ULTIMATE_FIRST_ROLL_MS,
+      ranger: ULTIMATE_FIRST_ROLL_MS,
+    };
     waveTimeRemainingMs.current = waveTimeLimit * 1000;
     lastSpawnGameMs.current = 0;
     setWaveTimeRemainingSec(waveTimeLimit);
@@ -1183,6 +1306,11 @@ export default function RogueTdPage() {
 
     const frame = (now: number) => {
       if (pausedRef.current) return;
+      if (ultimateActiveRef.current) {
+        lastFrame.current = now;
+        raf = requestAnimationFrame(frame);
+        return;
+      }
       const realDt = Math.min(40, Math.max(0, now - lastFrame.current));
       lastFrame.current = now;
       if (waveTimeRemainingMs.current <= 0) return;
@@ -1197,6 +1325,38 @@ export default function RogueTdPage() {
       const gameNow = gameTimeMs.current;
 
       setWaveTimeRemainingSec(Math.ceil(waveTimeRemainingMs.current / 1000));
+
+      // 직업별 3성 유닛 3종이 모두 배치되면 보이지 않는 독립 판정을 수행한다.
+      (["warrior", "mage", "ranger"] as UnitClass[]).forEach((unitClass) => {
+        if (gameNow < ultimateNextRollAtRef.current[unitClass]) return;
+        const requiredTypes = ULTIMATE_UNIT_TYPES[unitClass];
+        const trio = requiredTypes.map((typeId) =>
+          unitsRef.current.find((unit) => unit.typeId === typeId && unit.tier === 3),
+        );
+        if (trio.some((unit) => !unit)) return;
+
+        if (Math.random() < ULTIMATE_TRIGGER_CHANCE) {
+          const contributions = trio.map((unit) => {
+            const deployedUnit = unit!;
+            const definition = UNIT_TYPES[deployedUnit.typeId];
+            const upgradeLevels = getUpgradeLevels(upgrades, deployedUnit.typeId);
+            return {
+              unitId: deployedUnit.id,
+              typeId: deployedUnit.typeId,
+              damage: Math.max(1, Math.round(
+                definition.damage * (
+                  getUnitTierDamageMultiplier(deployedUnit.tier, definition.unitClass) +
+                  upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL
+                ) * ULTIMATE_DAMAGE_MULTIPLIER[unitClass],
+              )),
+            };
+          });
+          enqueueUltimate({ unitClass, unitTypeIds: requiredTypes, contributions });
+          ultimateNextRollAtRef.current[unitClass] = gameNow + ULTIMATE_SUCCESS_COOLDOWN_MS;
+        } else {
+          ultimateNextRollAtRef.current[unitClass] = gameNow + ULTIMATE_FAIL_COOLDOWN_MS;
+        }
+      });
 
       // 1. 일반 웨이브는 유형별 비율대로, 5의 배수 웨이브는 보스 1마리 스폰
       if (toSpawn > 0 && gameNow - lastSpawnGameMs.current >= MONSTER_SPAWN_MS) {
@@ -2004,6 +2164,36 @@ export default function RogueTdPage() {
         return actualDamage;
       };
 
+      if (pendingUltimateHitsRef.current.length > 0) {
+        const ultimateJobs = pendingUltimateHitsRef.current.splice(0);
+        ultimateJobs.forEach((job) => {
+          [...monstersRef.current].forEach((monster) => {
+            if (monster.hp <= 0) return;
+            job.contributions.forEach((contribution) => {
+              const definition = UNIT_TYPES[contribution.typeId];
+              const losesLight = monster.isFinalBoss && monster.finalBossMode === "combat" && (
+                monster.finalBossPhase === 4 ||
+                (monster.finalBossPhase === 1 && definition.specType === "balance") ||
+                (monster.finalBossPhase === 2 && definition.specType === "land_spec") ||
+                (monster.finalBossPhase === 3 && definition.specType === "air_spec")
+              );
+              dealDamage(
+                monster,
+                Math.max(1, Math.round(contribution.damage * (losesLight ? 0.5 : 1))),
+                contribution.unitId,
+              );
+            });
+          });
+          const skillName = job.unitClass === "warrior"
+            ? "천검난무"
+            : job.unitClass === "mage"
+              ? "종말대마법"
+              : "궤도섬멸포격";
+          setStatus(`필살기 · ${skillName}가 맵 전체를 타격했습니다!`);
+          addLog(`${skillName}가 발동해 모든 적을 공격했습니다.`);
+        });
+      }
+
       for (const p of projectilesRef.current) {
         if (p.delayMs > 0) {
           p.delayMs = Math.max(0, p.delayMs - dt);
@@ -2031,26 +2221,10 @@ export default function RogueTdPage() {
                 dealDamage(m, getAreaDamage(p, m), p.sourceUnitId);
               });
             }
-            // 🔥 화염술사: 주 대상 주변 범위 피해 + 테스트 확률 화상
+            // 화염술사: 확률 발동 시 주 대상 주변 1.5칸 범위 피해
             else if (p.effectType === "fire") {
               nearbyMonsters.forEach((m) => {
-                const actualDamage = dealDamage(m, getAreaDamage(p, m), p.sourceUnitId);
-
-                // 실제 입힌 피해의 50%만큼 즉시 화상 피해
-                const isImmune =
-                  m.statusImmunityUntilMs && gameNow < m.statusImmunityUntilMs;
-                if (
-                  m.hp > 0 &&
-                  !isImmune &&
-                  Math.random() < FIRE_BURN_CHANCE + MAGE_STATUS_CHANCE_BONUS[synergy.classTiers.mage]
-                ) {
-                  const burnExtraDmg = Math.round(actualDamage * 0.5);
-                  if (burnExtraDmg > 0) {
-                    dealDamage(m, burnExtraDmg, p.sourceUnitId);
-                    m.burnEffectUntilMs = gameNow + 520;
-                    m.statusImmunityUntilMs = gameNow + 1000;
-                  }
-                }
+                dealDamage(m, getAreaDamage(p, m), p.sourceUnitId);
               });
             }
             // 💥 산탄총병: 적마다 사수와의 거리·상성을 따로 적용
@@ -2237,8 +2411,11 @@ export default function RogueTdPage() {
         } else {
           let effectType: Projectile["effectType"] = "normal";
 
-          if (unit.typeId === "fire_mage") {
-            effectType = "fire"; // 화염 범위
+          if (
+            unit.typeId === "fire_mage" &&
+            Math.random() < FIRE_AREA_CHANCE + MAGE_STATUS_CHANCE_BONUS[synergy.classTiers.mage]
+          ) {
+            effectType = "fire";
           } else if (unit.typeId === "magic_swordsman") {
             effectType = "magic_swordsman";
           } else if (
@@ -2489,7 +2666,7 @@ export default function RogueTdPage() {
   };
 
   return (
-    <main className="gamePage">
+    <main className={`gamePage ${ultimateSequence ? `ultimateSequenceActive ultimate-${ultimateSequence.phase} ultimate-${ultimateSequence.job.unitClass}` : ""}`}>
       {debugCodePromptOpen && (
         <div className="confirmOverlay" role="presentation">
           <form
@@ -2538,6 +2715,7 @@ export default function RogueTdPage() {
           onSpawnStage={handleDebugSpawnStage}
           onClearMonsters={handleDebugClearMonsters}
           onSetTimer={handleDebugSetTimer}
+          onPreviewUltimate={handleDebugPreviewUltimate}
           onClose={() => { setDebugMode(false); setDebugBrush(null); }}
         />
       )}
@@ -2615,13 +2793,21 @@ export default function RogueTdPage() {
             onBossClick={handleBossClick}
             projectiles={projectiles}
             gameNowMs={gameTimeMs.current}
-            animationPaused={!running || paused}
+            animationPaused={!running || paused || ultimateSequence !== null}
             animationSpeed={gameSpeed}
             boardShaking={gameTimeMs.current < boardShakeUntilMs.current}
             bossWarning={bossWarning}
             activeCellIndex={activeCellIndex}
             highlightedPlacementCells={highlightMapPlacement}
             renderCellMenu={renderCellMenu}
+            ultimateOverlay={ultimateSequence ? (
+              <UltimateCutIn
+                key={`${ultimateSequence.token}-${ultimateSequence.phase}`}
+                unitClass={ultimateSequence.job.unitClass}
+                unitTypeIds={ultimateSequence.job.unitTypeIds}
+                phase={ultimateSequence.phase}
+              />
+            ) : null}
           />
 
           <UpgradeStrip upgrades={upgrades} />

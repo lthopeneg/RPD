@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MAX_PLAYER_LEVEL, UNIT_TYPES } from "../../games/rogueTd/constants";
-import type { UnitTypeId } from "../../games/rogueTd/types";
+import type { UnitClass, UnitTypeId } from "../../games/rogueTd/types";
 
 export type DebugBrush = "start" | "goal" | "empty" | "natural" | "player" | "permanent";
 export type DebugStagePreset =
@@ -19,6 +19,7 @@ interface Props {
   onSpawnStage: (count: number) => void;
   onClearMonsters: () => void;
   onSetTimer: (seconds: number) => void;
+  onPreviewUltimate: (unitClass: UnitClass) => void;
   onClose: () => void;
 }
 
@@ -39,6 +40,7 @@ export default function DebugPanel(props: Props) {
   const [stagePreset, setStagePreset] = useState<DebugStagePreset>("normal-human");
   const [monsterCount, setMonsterCount] = useState(1);
   const [timer, setTimer] = useState(40);
+  const [ultimateClass, setUltimateClass] = useState<UnitClass>("warrior");
 
   return (
     <aside className="debugPanel" aria-label="디버그 모드">
@@ -119,6 +121,22 @@ export default function DebugPanel(props: Props) {
       <section className="debugInline">
         <label>타이머 <input type="number" min="1" max="9999" value={timer} onChange={(e) => setTimer(Number(e.target.value))} /></label>
         <button type="button" onClick={() => props.onSetTimer(timer)}>초 적용</button>
+      </section>
+
+      <section>
+        <span className="debugHint">필살스킬 연출 확인</span>
+        <div className="debugInline">
+          <select
+            aria-label="확인할 필살스킬 직업"
+            value={ultimateClass}
+            onChange={(event) => setUltimateClass(event.target.value as UnitClass)}
+          >
+            <option value="warrior">전사 필살기</option>
+            <option value="mage">마법사 필살기</option>
+            <option value="ranger">사수 필살기</option>
+          </select>
+          <button type="button" onClick={() => props.onPreviewUltimate(ultimateClass)}>연출 실행</button>
+        </div>
       </section>
     </aside>
   );

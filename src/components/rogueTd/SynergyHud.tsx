@@ -4,6 +4,7 @@ import {
   LAND_DAMAGE_BONUS,
   MAGE_STATUS_CHANCE_BONUS,
   RANGER_RANGE_BONUS_TILES,
+  SYNERGY_THRESHOLDS,
   WARRIOR_ATTACK_SPEED_BONUS,
 } from "../../games/rogueTd/synergies";
 import type { SynergyState } from "../../games/rogueTd/synergies";
@@ -19,8 +20,9 @@ interface SynergyItemProps {
   colorClass: string;
 }
 
+const MAX_SYNERGY_COUNT = SYNERGY_THRESHOLDS[SYNERGY_THRESHOLDS.length - 1];
 const getNextThreshold = (count: number) =>
-  count >= 15 ? 15 : (Math.floor(count / 3) + 1) * 3;
+  SYNERGY_THRESHOLDS.find((threshold) => count < threshold) ?? MAX_SYNERGY_COUNT;
 
 function SynergyItem({
   name,
@@ -36,7 +38,7 @@ function SynergyItem({
     <div className={`synergyItem ${colorClass}`}>
       <div className="synergyItemTitle">
         <strong>{name}</strong>
-        <span>{count}/{threshold}{count >= 15 ? " MAX" : ""}</span>
+        <span>{count}/{threshold}{count >= MAX_SYNERGY_COUNT ? " MAX" : ""}</span>
       </div>
       <div className="synergyEffectPreview">
         <span className="synergyEffectName">{description} :</span>
@@ -66,7 +68,7 @@ export default function SynergyHud({ synergy }: Props) {
           description="전사 유닛 공격 속도 증가" values={WARRIOR_ATTACK_SPEED_BONUS}
           formatValue={percent} colorClass="warrior" />
         <SynergyItem name="마법사" count={classCounts.mage} tier={classTiers.mage}
-          description="마법사 상태이상 확률 증가" values={MAGE_STATUS_CHANCE_BONUS}
+          description="마법사 특수효과 발동 확률 증가" values={MAGE_STATUS_CHANCE_BONUS}
           formatValue={percentPoint} colorClass="mage" />
         <SynergyItem name="사수" count={classCounts.ranger} tier={classTiers.ranger}
           description="사수 유닛 사거리 증가" values={RANGER_RANGE_BONUS_TILES}

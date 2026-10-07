@@ -87,6 +87,7 @@ interface Props {
   activeCellIndex: number | null;
   highlightedPlacementCells: boolean;
   renderCellMenu: (cellIndex: number) => ReactNode;
+  ultimateOverlay?: ReactNode;
 }
 
 interface FinalBossBolt {
@@ -280,6 +281,7 @@ export default function GameBoard(p: Props) {
           "--final-boss-y": `${finalBossPosition.y}%`,
         } as CSSProperties}
       >
+        {p.ultimateOverlay}
         {p.bossWarning && (
           <div key={p.bossWarning.token} className="bossStageWarning" role="status" aria-live="assertive">
             <span className="bossWarningTriangle" aria-hidden="true"><i>!</i></span>
