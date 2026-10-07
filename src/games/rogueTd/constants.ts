@@ -196,7 +196,7 @@ export const STAGE30_MAGNETIC_STUN_MS = 3000;
 export const BOSS_SNIPER_DAMAGE_MULTIPLIER = 3; // 즉사 발동 시 보스 대상 테스트 피해 배율
 export const FIRE_AREA_CHANCE = 0.30;
 export const ICE_SLOW_CHANCE = 0.10;
-export const LIGHTNING_PARALYZE_CHANCE = 0.10;
+export const LIGHTNING_PARALYZE_CHANCE = 0.15;
 export const SNIPER_EXECUTE_CHANCE = 0.05;
 
 // 신규 룰 관련 상수
@@ -310,7 +310,7 @@ export const UNIT_TYPES: Record<UnitTypeId, UnitTypeDef> = {
     unitClass: "mage",
     specType: "land_spec",
     cost: SHOP_DRAW_COST,
-    damage: 9,
+    damage: 10,
     rangeTiles: 2.3,
     attackIntervalMs: 850,
     description: "육지 특화 CC 마법사 (10% 확률로 주변 적 1초간 50% 둔화)",
@@ -323,7 +323,7 @@ export const UNIT_TYPES: Record<UnitTypeId, UnitTypeDef> = {
     unitClass: "mage",
     specType: "air_spec",
     cost: SHOP_DRAW_COST,
-    damage: 10,
+    damage: 11,
     rangeTiles: 2.4,
     attackIntervalMs: 900,
     description: "조류 특화 CC 마법사 (10% 확률로 대상 1초간 마비/이동불가)",

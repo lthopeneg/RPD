@@ -1015,7 +1015,23 @@ export default function RogueTdPage() {
   };
 
   const handleSelectStorageSlot = (index: number) => {
-    if (running) return;
+    if (running) {
+      const clicked = storageSlots[index];
+      if (!clicked) return;
+      const deselecting = selectedStorageIndex === index && selectedUnitId === null;
+      setSelectedStorageIndex(deselecting ? null : index);
+      setSelectedUnitId(null);
+      setSelectedBossId(null);
+      setShowStageBossInfo(false);
+      setActiveStorageIndex(null);
+      setActiveCellIndex(null);
+      setMapPlacementTarget(null);
+      setHighlightMapPlacement(false);
+      setStatus(deselecting
+        ? "선택을 해제했어."
+        : `📦 [${UNIT_TYPES[clicked.typeId].name}] 상세정보 확인 중.`);
+      return;
+    }
     if (activeStorageIndex === index) {
       clearInteraction();
       setStatus("선택을 해제했어.");
@@ -1118,7 +1134,23 @@ export default function RogueTdPage() {
       handleDebugCellClick(cellIndex);
       return;
     }
-    if (running) return;
+    if (running) {
+      const clickedUnit = units.find((unit) => unit.cell === cellIndex);
+      if (!clickedUnit) return;
+      const deselecting = selectedUnitId === clickedUnit.id && selectedStorageIndex === null;
+      setSelectedUnitId(deselecting ? null : clickedUnit.id);
+      setSelectedStorageIndex(null);
+      setSelectedBossId(null);
+      setShowStageBossInfo(false);
+      setActiveCellIndex(null);
+      setActiveStorageIndex(null);
+      setMapPlacementTarget(null);
+      setHighlightMapPlacement(false);
+      setStatus(deselecting
+        ? "선택을 해제했어."
+        : `⚔️ [${UNIT_TYPES[clickedUnit.typeId].name}] 상세정보 확인 중.`);
+      return;
+    }
     if (activeCellIndex === cellIndex) {
       clearInteraction();
       setStatus("선택을 해제했어.");
