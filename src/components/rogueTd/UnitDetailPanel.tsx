@@ -78,6 +78,18 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
     if (unit.typeId === "swordsman" || unit.typeId === "rifleman") return <>없음</>;
     return <>{def.description}</>;
   })();
+  const tierTwoSkill = (() => {
+    if (unit.tier < 2) return null;
+    if (unit.typeId === "swordsman") return <><b>연속베기 · 액티브</b><span>8초마다 다음 공격으로 총 220% 피해</span></>;
+    if (unit.typeId === "dual_swordsman") return <><b>혈흔 · 패시브</b><span>공격 시 20% 확률로 3초 출혈(매초 최대 체력 2%, 틱당 최대 30)</span></>;
+    if (unit.typeId === "magic_swordsman") return <><b>마력각인 · 패시브</b><span>공격 시 15% 확률로 6초간 받는 피해 증가(일반 10%, 보스 5%)</span></>;
+    if (unit.typeId === "fire_mage") return <><b>불씨 확산 · 패시브</b><span>기본 공격이 주변 적에게 20% 피해</span></>;
+    if (unit.typeId === "ice_mage") return <><b>프로즌 오브 · 액티브</b><span>12초마다 6초간 주변을 타격하는 얼음 구체 설치</span></>;
+    if (unit.typeId === "lightning_mage") return <><b>체인 라이트닝 · 액티브</b><span>9초마다 최대 6명에게 전이되는 연쇄 번개</span></>;
+    if (unit.typeId === "rifleman") return <><b>아드레날린 · 액티브</b><span>4초간 공격속도 3배, 이후 2초간 0.5배</span></>;
+    if (unit.typeId === "shotgunner") return <><b>전탄 사격 · 액티브</b><span>8초마다 자신 주변 원형 범위에 산탄 발사</span></>;
+    return <><b>매의 눈 · 패시브</b><span>2.5칸 이상 떨어진 대상에게 피해 20% 증가</span></>;
+  })();
 
   return (
     <section className="unitDetailPanel panelBox">
@@ -101,6 +113,7 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
           <div><dt>{specTarget} 피해</dt><dd>{specBonus > 0 ? <b className="synergyStat">+{percent(specBonus)}</b> : "없음"}</dd></div>
         </dl>
         <div className="unitSpecialEffect"><strong>특수효과</strong><p>{specialEffect}</p></div>
+        {tierTwoSkill && <div className="unitTierSkill"><strong>2성 스킬</strong><p>{tierTwoSkill}</p></div>}
       </div>
     </section>
   );

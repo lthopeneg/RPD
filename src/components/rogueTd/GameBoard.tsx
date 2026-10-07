@@ -7,7 +7,12 @@ import type {
 } from "../../games/rogueTd/types";
 import {
   COLS,
+  CHAIN_LIGHTNING_COOLDOWN_MS,
+  FROZEN_ORB_COOLDOWN_MS,
   ROWS,
+  RIFLE_ADRENALINE_CYCLE_MS,
+  SHOTGUN_BARRAGE_COOLDOWN_MS,
+  SWORDSMAN_COMBO_COOLDOWN_MS,
   STAGE05_ABSORB_CAST_MS,
   STAGE05_SUMMON_CAST_MS,
   STAGE10_STOMP_RADIUS_TILES,
@@ -34,6 +39,24 @@ const ROAD_STRAIGHT_IMAGE = new URL("../../images/road-straight.png", import.met
 const ROAD_CORNER_IMAGE = new URL("../../images/road-corner.png", import.meta.url).href;
 const ROAD_THREEWAY_IMAGE = new URL("../../images/road-threeway.png", import.meta.url).href;
 const ROAD_FOURWAY_IMAGE = new URL("../../images/road-fourway.png", import.meta.url).href;
+const FROZEN_ORB_EFFECT_IMAGE = new URL("../../images/frozen-orb-effect.png", import.meta.url).href;
+const BLEED_EFFECT_IMAGE = new URL("../../images/bleed-effect.png", import.meta.url).href;
+const MAGIC_MARK_EFFECT_IMAGE = new URL("../../images/magic-mark-effect.png", import.meta.url).href;
+const CHAIN_LIGHTNING_EFFECT_IMAGE = new URL("../../images/chain-lightning-effect.png", import.meta.url).href;
+const ACTIVE_SKILL_ICONS: Partial<Record<Unit["typeId"], string>> = {
+  swordsman: new URL("../../images/skill-combo.png", import.meta.url).href,
+  ice_mage: new URL("../../images/skill-frozen-orb.png", import.meta.url).href,
+  lightning_mage: new URL("../../images/skill-chain-lightning.png", import.meta.url).href,
+  rifleman: new URL("../../images/skill-adrenaline.png", import.meta.url).href,
+  shotgunner: new URL("../../images/skill-barrage.png", import.meta.url).href,
+};
+const ACTIVE_SKILL_COOLDOWNS: Partial<Record<Unit["typeId"], number>> = {
+  swordsman: SWORDSMAN_COMBO_COOLDOWN_MS,
+  ice_mage: FROZEN_ORB_COOLDOWN_MS,
+  lightning_mage: CHAIN_LIGHTNING_COOLDOWN_MS,
+  rifleman: RIFLE_ADRENALINE_CYCLE_MS,
+  shotgunner: SHOTGUN_BARRAGE_COOLDOWN_MS,
+};
 
 function getRoadTile(cellIndex: number, pathCells: Set<number>) {
   if (!pathCells.has(cellIndex)) return { src: ROAD_GRASS_IMAGE, rotation: 0 };
@@ -296,6 +319,12 @@ export default function GameBoard(p: Props) {
           const pathPulseOrder = pathIndex === undefined ? -1 : pathIndex - pathPulseStart;
           const showPathPulse = p.pathVisible && pathPulseOrder >= 0 && pathPulseOrder < 3;
           const spriteClass = u ? UNIT_SPRITE_CLASSES[u.typeId] : null;
+          const activeSkillIcon = u ? ACTIVE_SKILL_ICONS[u.typeId] : undefined;
+          const activeSkillCooldown = u ? ACTIVE_SKILL_COOLDOWNS[u.typeId] : undefined;
+          const activeSkillRemaining = u?.activeSkillCooldownMs ?? 0;
+          const activeSkillProgress = activeSkillCooldown
+            ? Math.max(0, Math.min(1, 1 - activeSkillRemaining / activeSkillCooldown))
+            : 0;
           const attackAge = u?.lastAttackTimeMs === undefined
             ? Number.POSITIVE_INFINITY
             : now - u.lastAttackTimeMs;
@@ -365,6 +394,20 @@ export default function GameBoard(p: Props) {
 
               {u && (
                 <div className={`unitWrapper ${isStunned ? "stunned" : ""}`} key={u.id}>
+                  {u.skillEffectUntilMs !== undefined && now < u.skillEffectUntilMs && (
+                    <span className={`tierTwoSkillBurst skill-${u.typeId}`} aria-hidden="true" />
+                  )}
+                  {u.tier >= 2 && activeSkillIcon && activeSkillCooldown && (
+                    <span
+                      className={`unitActiveSkill ${activeSkillRemaining <= 0 ? "ready" : ""}`}
+                      style={{ "--skill-ready": `${activeSkillProgress * 360}deg` } as CSSProperties}
+                      title={activeSkillRemaining <= 0 ? "스킬 준비 완료" : `재사용 대기 ${(activeSkillRemaining / 1000).toFixed(1)}초`}
+                    >
+                      <img src={activeSkillIcon} alt="" />
+                      <i aria-hidden="true" />
+                      <b>{activeSkillRemaining <= 0 ? "!" : Math.ceil(activeSkillRemaining / 1000)}</b>
+                    </span>
+                  )}
                   {u.tier >= 2 && (
                     <span
                       className={`unitTierTwoAura ${u.tier === 3 ? "tierThreeBase" : ""}`}
@@ -436,6 +479,26 @@ export default function GameBoard(p: Props) {
             </div>
           );
         })}
+
+        {p.units
+          .filter((unit) => unit.frozenOrbCell !== undefined && unit.frozenOrbUntilMs !== undefined && now < unit.frozenOrbUntilMs)
+          .map((unit) => {
+            const cell = unit.frozenOrbCell!;
+            return (
+              <img
+                key={`orb-${unit.id}`}
+                className="frozenOrbEffect"
+                src={FROZEN_ORB_EFFECT_IMAGE}
+                alt=""
+                style={{
+                  left: `${(((cell % COLS) + 0.5) / COLS) * 100}%`,
+                  top: `${((Math.floor(cell / COLS) + 0.5) / ROWS) * 100}%`,
+                  animationDuration: `${900 / p.animationSpeed}ms`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                }}
+              />
+            );
+          })}
 
         {selectedUnit && (
           <span
@@ -727,6 +790,9 @@ export default function GameBoard(p: Props) {
             projectile.sourceTypeId === "sniper" &&
             projectile.effectType === "sniper"
           );
+          const isBleeding = m.bleedUntilMs !== undefined && now < m.bleedUntilMs;
+          const isMagicMarked = m.magicMarkUntilMs !== undefined && now < m.magicMarkUntilMs;
+          const isChainHit = m.chainHitUntilMs !== undefined && now < m.chainHitUntilMs;
 
           const displayedMaxHp = m.bossStage === 15 && stage15State !== "phoenix"
             ? m.stage15EggMaxHp ?? m.maxHp
@@ -883,6 +949,9 @@ export default function GameBoard(p: Props) {
                   aria-hidden="true"
                 />
               )}
+              {isBleeding && <img className="monsterSkillStatus bleed" src={BLEED_EFFECT_IMAGE} alt="출혈" />}
+              {isMagicMarked && <img className="monsterSkillStatus magicMark" src={MAGIC_MARK_EFFECT_IMAGE} alt="마력각인" />}
+              {isChainHit && <img className="monsterChainHit" src={CHAIN_LIGHTNING_EFFECT_IMAGE} alt="" />}
               <span
                 className={`monsterSprite ${m.isBoss ? "bossSprite" : ""} ${displayedSpriteClass} move-${moveDirection}`}
                 style={{

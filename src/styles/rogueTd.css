@@ -4493,3 +4493,106 @@ body {
   .leftRail .synergyValues { font-size: 10px; }
 }
 
+.unitActiveSkill {
+  --skill-ready: 0deg;
+  position: absolute;
+  left: 50%;
+  top: -25px;
+  width: 24px;
+  height: 24px;
+  transform: translateX(-50%);
+  z-index: 18;
+  border-radius: 50%;
+  background: #05070c;
+  border: 1px solid rgba(226, 232, 240, 0.82);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  pointer-events: none;
+}
+.unitActiveSkill img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.unitActiveSkill i {
+  position: absolute;
+  inset: 0;
+  background: conic-gradient(from 0deg, transparent 0deg var(--skill-ready), rgba(0, 0, 0, 0.88) var(--skill-ready) 360deg);
+}
+.unitActiveSkill b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: white;
+  font-size: 10px;
+  line-height: 1;
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
+}
+.unitActiveSkill.ready { border-color: #fde68a; box-shadow: 0 0 8px rgba(250, 204, 21, 0.9); animation: activeSkillReadyPulse 700ms ease-in-out infinite alternate; }
+@keyframes activeSkillReadyPulse { to { transform: translateX(-50%) scale(1.12); filter: brightness(1.25); } }
+
+.tierTwoSkillBurst {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 70px; height: 70px;
+  transform: translate(-50%, -50%);
+  z-index: 13;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 12px currentColor, inset 0 0 12px currentColor;
+  color: #f8fafc;
+  animation: tierTwoSkillBurst 520ms ease-out both;
+  pointer-events: none;
+}
+.tierTwoSkillBurst.skill-swordsman { color: #60a5fa; }
+.tierTwoSkillBurst.skill-ice_mage { color: #38bdf8; }
+.tierTwoSkillBurst.skill-lightning_mage { color: #facc15; }
+.tierTwoSkillBurst.skill-rifleman { color: #4ade80; }
+.tierTwoSkillBurst.skill-shotgunner { color: #fb923c; }
+@keyframes tierTwoSkillBurst { from { opacity: 1; transform: translate(-50%, -50%) scale(.25); } to { opacity: 0; transform: translate(-50%, -50%) scale(1.35); } }
+
+.frozenOrbEffect {
+  position: absolute;
+  width: 7%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -58%);
+  z-index: 14;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 7px #7dd3fc);
+  animation: frozenOrbHover 900ms ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes frozenOrbHover { to { transform: translate(-50%, -72%) rotate(18deg) scale(1.08); filter: drop-shadow(0 0 11px #e0f2fe); } }
+
+.monsterSkillStatus {
+  position: absolute;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  transform: translateX(-50%);
+  z-index: 20;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.unitTierSkill {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(96, 165, 250, 0.28);
+}
+.unitTierSkill > strong { color: #7dd3fc; font-size: 11px; }
+.unitTierSkill p { margin: 3px 0 0; display: grid; gap: 2px; font-size: 11px; color: #cbd5e1; }
+.unitTierSkill p b { color: #f8fafc; }
+.monsterSkillStatus.bleed { top: -45px; animation: bleedStatusPulse 650ms ease-in-out infinite alternate; }
+.monsterSkillStatus.magicMark { top: -17px; animation: magicMarkSpin 1800ms linear infinite; }
+.monsterChainHit {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 72px; height: 72px;
+  transform: translate(-50%, -50%);
+  z-index: 19;
+  object-fit: contain;
+  filter: drop-shadow(0 0 7px #fde047);
+  animation: chainHitFlash 450ms ease-out both;
+  pointer-events: none;
+}
+@keyframes bleedStatusPulse { to { transform: translateX(-50%) scale(1.18); filter: brightness(1.35); } }
+@keyframes magicMarkSpin { to { transform: translateX(-50%) rotate(360deg); } }
+@keyframes chainHitFlash { from { opacity: 1; transform: translate(-50%, -50%) scale(.5); } to { opacity: 0; transform: translate(-50%, -50%) scale(1.2); } }

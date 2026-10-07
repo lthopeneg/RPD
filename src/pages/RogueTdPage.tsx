@@ -26,9 +26,14 @@ import {
 import {
   BOSS_KILL_GOLD,
   BOSS_SNIPER_DAMAGE_MULTIPLIER,
+  CHAIN_LIGHTNING_COOLDOWN_MS,
   DAMAGE_MULTIPLIERS,
   CELL_COUNT,
   FIRE_AREA_CHANCE,
+  FIRE_SPLASH_RATIO,
+  FROZEN_ORB_COOLDOWN_MS,
+  FROZEN_ORB_DURATION_MS,
+  FROZEN_ORB_TICK_MS,
   getWaveTimeLimit,
   getBossCategory,
   getBossClearGold,
@@ -46,6 +51,8 @@ import {
   isFinalStage,
   isBossWave,
   LIGHTNING_PARALYZE_CHANCE,
+  MAGIC_MARK_CHANCE,
+  MAGIC_MARK_DURATION_MS,
   MAX_MONSTER_LAPS,
   MAX_PLAYER_LEVEL,
   MONSTER_KILL_GOLD,
@@ -57,7 +64,19 @@ import {
   PLAYER_WALL_REFUND_RATE,
   PROTOTYPE_WAVES,
   SHOP_DRAW_COST,
+  SHOTGUN_BARRAGE_COOLDOWN_MS,
+  SHOTGUN_BARRAGE_RADIUS_TILES,
   SNIPER_EXECUTE_CHANCE,
+  SWORDSMAN_COMBO_COOLDOWN_MS,
+  SWORDSMAN_COMBO_DAMAGE_RATIO,
+  DUAL_BLEED_CHANCE,
+  DUAL_BLEED_DURATION_MS,
+  DUAL_BLEED_MAX_TICK_DAMAGE,
+  DUAL_BLEED_TICK_MS,
+  RIFLE_ADRENALINE_BOOST_MS,
+  RIFLE_ADRENALINE_CYCLE_MS,
+  RIFLE_ADRENALINE_FATIGUE_MS,
+  RIFLE_ADRENALINE_READY_MS,
   START_GOLD,
   START_LIFE,
   START_PLAYER_LEVEL,
@@ -159,6 +178,13 @@ const ULTIMATE_UNIT_TYPES: Record<UnitClass, UnitTypeId[]> = {
   warrior: ["swordsman", "dual_swordsman", "magic_swordsman"],
   mage: ["fire_mage", "ice_mage", "lightning_mage"],
   ranger: ["rifleman", "shotgunner", "sniper"],
+};
+const ACTIVE_SKILL_INITIAL_COOLDOWN: Partial<Record<UnitTypeId, number>> = {
+  swordsman: SWORDSMAN_COMBO_COOLDOWN_MS,
+  ice_mage: FROZEN_ORB_COOLDOWN_MS,
+  lightning_mage: CHAIN_LIGHTNING_COOLDOWN_MS,
+  rifleman: RIFLE_ADRENALINE_READY_MS,
+  shotgunner: SHOTGUN_BARRAGE_COOLDOWN_MS,
 };
 interface UltimateContribution {
   unitId: number;
@@ -1245,6 +1271,15 @@ export default function RogueTdPage() {
       targetId: null,
       lastAttackTimeMs: undefined,
       stunnedUntilMs: undefined,
+      activeSkillCooldownMs: unit.tier >= 2
+        ? ACTIVE_SKILL_INITIAL_COOLDOWN[unit.typeId]
+        : undefined,
+      skillEffectUntilMs: undefined,
+      adrenalinePhase: undefined,
+      adrenalinePhaseUntilMs: undefined,
+      frozenOrbCell: undefined,
+      frozenOrbUntilMs: undefined,
+      frozenOrbNextTickMs: undefined,
     }));
     unitsRef.current = restedUnits;
     setUnits(restedUnits);
@@ -2071,7 +2106,7 @@ export default function RogueTdPage() {
           distanceFactor,
         ));
 
-      const dealDamage = (m: Monster, damage: number, sourceUnitId: number) => {
+      const dealDamage = (m: Monster, damage: number, sourceUnitId: number, ignoreMagicMark = false) => {
         const stage15State = m.stage15State ?? "phoenix";
         if (
           m.hp <= 0 ||
@@ -2139,6 +2174,9 @@ export default function RogueTdPage() {
             }
           }
         }
+        if (!ignoreMagicMark && m.magicMarkUntilMs !== undefined && gameNow < m.magicMarkUntilMs) {
+          damage = Math.max(1, Math.round(damage * (m.isBoss ? 1.05 : 1.1)));
+        }
         const reducedDamage = m.bossStage === 15 && stage15State === "egg"
           ? Math.max(1, Math.round(damage * (1 - STAGE15_EGG_DAMAGE_REDUCTION)))
           : m.bossStage === 20 && m.stage20State === "stunned"
@@ -2196,6 +2234,29 @@ export default function RogueTdPage() {
         return actualDamage;
       };
 
+      monstersRef.current.forEach((monster) => {
+        if (
+          monster.hp <= 0 ||
+          monster.bleedUntilMs === undefined ||
+          monster.bleedNextTickMs === undefined ||
+          monster.bleedSourceUnitId === undefined
+        ) return;
+        if (gameNow >= monster.bleedUntilMs) {
+          monster.bleedUntilMs = undefined;
+          monster.bleedNextTickMs = undefined;
+          monster.bleedSourceUnitId = undefined;
+          return;
+        }
+        while (gameNow >= monster.bleedNextTickMs && monster.hp > 0) {
+          const bleedDamage = Math.min(
+            DUAL_BLEED_MAX_TICK_DAMAGE,
+            Math.max(1, Math.round(monster.maxHp * 0.02)),
+          );
+          dealDamage(monster, bleedDamage, monster.bleedSourceUnitId, true);
+          monster.bleedNextTickMs += DUAL_BLEED_TICK_MS;
+        }
+      });
+
       if (pendingUltimateHitsRef.current.length > 0) {
         const ultimateJobs = pendingUltimateHitsRef.current.splice(0);
         ultimateJobs.forEach((job) => {
@@ -2252,6 +2313,10 @@ export default function RogueTdPage() {
               splashList.forEach((m) => {
                 dealDamage(m, getAreaDamage(p, m), p.sourceUnitId);
               });
+              const sourceUnit = unitsRef.current.find((unit) => unit.id === p.sourceUnitId);
+              if (sourceUnit?.tier && sourceUnit.tier >= 2 && Math.random() < MAGIC_MARK_CHANCE) {
+                targetMon.magicMarkUntilMs = gameNow + MAGIC_MARK_DURATION_MS;
+              }
             }
             // 화염술사: 확률 발동 시 주 대상 주변 1.5칸 범위 피해
             else if (p.effectType === "fire") {
@@ -2281,6 +2346,25 @@ export default function RogueTdPage() {
                 }
               } else {
                 dealDamage(targetMon, p.damage, p.sourceUnitId);
+              }
+
+              const sourceUnit = unitsRef.current.find((unit) => unit.id === p.sourceUnitId);
+              if (sourceUnit?.tier && sourceUnit.tier >= 2 && p.sourceTypeId === "fire_mage") {
+                nearbyMonsters
+                  .filter((monster) => monster.id !== targetMon.id)
+                  .forEach((monster) => {
+                    dealDamage(
+                      monster,
+                      Math.max(1, Math.round(getAreaDamage(p, monster) * FIRE_SPLASH_RATIO)),
+                      p.sourceUnitId,
+                    );
+                  });
+              }
+
+              if (p.appliesBleed && targetMon.hp > 0) {
+                targetMon.bleedUntilMs = gameNow + DUAL_BLEED_DURATION_MS;
+                targetMon.bleedNextTickMs = gameNow + DUAL_BLEED_TICK_MS;
+                targetMon.bleedSourceUnitId = p.sourceUnitId;
               }
 
               // ❄️ 얼음술사 둔화: 주 대상 주변 1.5타일 안의 모든 몬스터에게 1초 50% 둔화 적용!
@@ -2322,11 +2406,57 @@ export default function RogueTdPage() {
 
       // 4. 유닛 사격 및 투사체 생성 (9종 유닛 스킬 개별 동작)
       for (const unit of unitsRef.current) {
+        const uDef = UNIT_TYPES[unit.typeId];
         unit.cooldownMs = Math.max(0, unit.cooldownMs - dt);
+        if (unit.activeSkillCooldownMs !== undefined) {
+          unit.activeSkillCooldownMs = Math.max(0, unit.activeSkillCooldownMs - dt);
+        }
+        if (unit.adrenalinePhase && unit.adrenalinePhaseUntilMs !== undefined && gameNow >= unit.adrenalinePhaseUntilMs) {
+          if (unit.adrenalinePhase === "boost") {
+            unit.adrenalinePhase = "fatigue";
+            unit.adrenalinePhaseUntilMs = gameNow + RIFLE_ADRENALINE_FATIGUE_MS;
+          } else {
+            unit.adrenalinePhase = undefined;
+            unit.adrenalinePhaseUntilMs = undefined;
+          }
+        }
+
+        if (
+          unit.frozenOrbCell !== undefined &&
+          unit.frozenOrbUntilMs !== undefined &&
+          unit.frozenOrbNextTickMs !== undefined
+        ) {
+          if (gameNow >= unit.frozenOrbUntilMs) {
+            unit.frozenOrbCell = undefined;
+            unit.frozenOrbUntilMs = undefined;
+            unit.frozenOrbNextTickMs = undefined;
+          } else if (gameNow >= unit.frozenOrbNextTickMs) {
+            const [orbRow, orbCol] = toRC(unit.frozenOrbCell);
+            const upgradeLevels = getUpgradeLevels(upgrades, unit.typeId);
+            const orbBaseDamage = uDef.damage * (
+              getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
+              upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL
+            );
+            monstersRef.current.forEach((monster) => {
+              if (monster.hp <= 0) return;
+              const [monsterRow, monsterCol] = getMonsterPos(monster);
+              if (Math.hypot(monsterRow - orbRow, monsterCol - orbCol) > 1.5) return;
+              const controlled =
+                (monster.slowUntilMs !== undefined && gameNow < monster.slowUntilMs) ||
+                (monster.paralyzeUntilMs !== undefined && gameNow < monster.paralyzeUntilMs);
+              const damage = Math.max(1, Math.round(
+                orbBaseDamage *
+                (controlled ? 0.5 : 0.2) *
+                DAMAGE_MULTIPLIERS[uDef.specType][monster.category] *
+                getSpecSynergyDamageMultiplier(uDef.specType, monster.category, synergy),
+              ));
+              dealDamage(monster, damage, unit.id);
+            });
+            unit.frozenOrbNextTickMs += FROZEN_ORB_TICK_MS;
+          }
+        }
         if (unit.stunnedUntilMs && gameNow < unit.stunnedUntilMs) continue;
         if (unit.cooldownMs > 0) continue;
-
-        const uDef = UNIT_TYPES[unit.typeId];
         const rangeTiles = unit.rangeTiles + (
           uDef.unitClass === "ranger"
             ? RANGER_RANGE_BONUS_TILES[synergy.classTiers.ranger] + getUnitTierRangeBonus(unit.tier, uDef.unitClass)
@@ -2367,6 +2497,22 @@ export default function RogueTdPage() {
           continue;
         }
 
+        if (unit.tier >= 2 && (unit.activeSkillCooldownMs ?? 1) <= 0) {
+          if (unit.typeId === "rifleman") {
+            unit.adrenalinePhase = "boost";
+            unit.adrenalinePhaseUntilMs = gameNow + RIFLE_ADRENALINE_BOOST_MS;
+            unit.activeSkillCooldownMs = RIFLE_ADRENALINE_CYCLE_MS;
+            unit.skillEffectUntilMs = gameNow + 500;
+          } else if (unit.typeId === "ice_mage") {
+            const targetRouteForOrb = target.route ?? path;
+            unit.frozenOrbCell = targetRouteForOrb[Math.min(target.pathStep, targetRouteForOrb.length - 1)] ?? start;
+            unit.frozenOrbUntilMs = gameNow + FROZEN_ORB_DURATION_MS;
+            unit.frozenOrbNextTickMs = gameNow;
+            unit.activeSkillCooldownMs = FROZEN_ORB_COOLDOWN_MS;
+            unit.skillEffectUntilMs = gameNow + 500;
+          }
+        }
+
         const targetRoute = target.route ?? path;
         const targetPathCell = targetRoute[Math.min(target.pathStep, targetRoute.length - 1)] ?? start;
         const nextTargetPathCell = targetRoute[Math.min(target.pathStep + 1, targetRoute.length - 1)] ?? targetPathCell;
@@ -2377,13 +2523,18 @@ export default function RogueTdPage() {
           unit.facing = interpolatedTargetCol < unitCol ? "left" : "right";
         }
         unit.targetId = target.id;
+        const adrenalineAttackSpeed = unit.adrenalinePhase === "boost"
+          ? 3
+          : unit.adrenalinePhase === "fatigue"
+            ? 0.5
+            : 1;
         unit.cooldownMs = uDef.unitClass === "warrior"
           ? unit.attackIntervalMs / (
               1 +
               WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior] +
               getUnitTierAttackSpeedBonus(unit.tier, uDef.unitClass)
             )
-          : unit.attackIntervalMs;
+          : unit.attackIntervalMs / adrenalineAttackSpeed;
         unit.lastAttackTimeMs = gameNow;
 
         // 상성 배율 계산
@@ -2403,10 +2554,90 @@ export default function RogueTdPage() {
           upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL
         );
         const penalizedBaseDmg = baseDmg * finalBossLightPenalty;
-        const calculatedDamage = Math.max(1, Math.round(penalizedBaseDmg * multiplier));
+        let calculatedDamage = Math.max(1, Math.round(penalizedBaseDmg * multiplier));
+        if (unit.tier >= 2 && unit.typeId === "sniper" && getDistance(target) >= 2.5) {
+          calculatedDamage = Math.max(1, Math.round(calculatedDamage * 1.2));
+        }
+
+        let swordsmanCombo = false;
+        if (
+          unit.tier >= 2 &&
+          unit.typeId === "swordsman" &&
+          (unit.activeSkillCooldownMs ?? 1) <= 0
+        ) {
+          calculatedDamage = Math.max(1, Math.round(calculatedDamage * SWORDSMAN_COMBO_DAMAGE_RATIO));
+          unit.activeSkillCooldownMs = SWORDSMAN_COMBO_COOLDOWN_MS;
+          unit.skillEffectUntilMs = gameNow + 520;
+          swordsmanCombo = true;
+        }
+
+        if (
+          unit.tier >= 2 &&
+          unit.typeId === "lightning_mage" &&
+          (unit.activeSkillCooldownMs ?? 1) <= 0
+        ) {
+          const chainTargets: Monster[] = [target];
+          while (chainTargets.length < 6) {
+            const previous = chainTargets[chainTargets.length - 1];
+            const next = monstersRef.current
+              .filter((monster) => monster.hp > 0 && !chainTargets.some((hit) => hit.id === monster.id))
+              .map((monster) => ({ monster, distance: getMonDist(previous, monster) }))
+              .filter((candidate) => candidate.distance <= 2.5)
+              .sort((a, b) => a.distance - b.distance)[0]?.monster;
+            if (!next) break;
+            chainTargets.push(next);
+          }
+          const ratios = [1.5, 1, 0.7, 0.5, 0.5, 0.5];
+          if (chainTargets.length <= 3) ratios[chainTargets.length - 1] = 2.5;
+          chainTargets.forEach((monster, index) => {
+            const losesLight = monster.isFinalBoss && monster.finalBossMode === "combat" && (
+              monster.finalBossPhase === 4 || monster.finalBossPhase === 3
+            );
+            const chainMultiplier = monster.isFinalBoss && monster.finalBossPhase === 4
+              ? 1
+              : DAMAGE_MULTIPLIERS[uDef.specType][monster.category] *
+                getSpecSynergyDamageMultiplier(uDef.specType, monster.category, synergy);
+            dealDamage(
+              monster,
+              Math.max(1, Math.round(baseDmg * (losesLight ? 0.5 : 1) * chainMultiplier * ratios[index])),
+              unit.id,
+            );
+            monster.chainHitUntilMs = gameNow + 450;
+            if (Math.random() < LIGHTNING_PARALYZE_CHANCE + MAGE_STATUS_CHANCE_BONUS[synergy.classTiers.mage]) {
+              const immune = monster.statusImmunityUntilMs !== undefined && gameNow < monster.statusImmunityUntilMs;
+              if (!immune && monster.hp > 0) {
+                monster.paralyzeUntilMs = gameNow + 1000;
+                monster.statusImmunityUntilMs = gameNow + 1000;
+              }
+            }
+          });
+          unit.activeSkillCooldownMs = CHAIN_LIGHTNING_COOLDOWN_MS;
+          unit.skillEffectUntilMs = gameNow + 500;
+          continue;
+        }
+
+        if (
+          unit.tier >= 2 &&
+          unit.typeId === "shotgunner" &&
+          (unit.activeSkillCooldownMs ?? 1) <= 0
+        ) {
+          monstersRef.current.forEach((monster) => {
+            if (monster.hp <= 0) return;
+            const distance = getDistance(monster);
+            if (distance > SHOTGUN_BARRAGE_RADIUS_TILES) return;
+            const ratio = 1 - Math.min(1, distance / SHOTGUN_BARRAGE_RADIUS_TILES) * 0.5;
+            const shotMultiplier = DAMAGE_MULTIPLIERS[uDef.specType][monster.category] *
+              getSpecSynergyDamageMultiplier(uDef.specType, monster.category, synergy);
+            dealDamage(monster, Math.max(1, Math.round(baseDmg * shotMultiplier * ratio)), unit.id);
+          });
+          unit.activeSkillCooldownMs = SHOTGUN_BARRAGE_COOLDOWN_MS;
+          unit.skillEffectUntilMs = gameNow + 520;
+          continue;
+        }
 
         // 유닛별 투사체 이펙트 및 발사 개수 분기
         if (unit.typeId === "dual_swordsman") {
+          const appliesBleed = unit.tier >= 2 && Math.random() < DUAL_BLEED_CHANCE;
           // 쌍검사: 두 타격의 합이 최종 피해량과 같도록 분배
           const firstHitDamage = Math.ceil(calculatedDamage / 2);
           const secondHitDamage = Math.floor(calculatedDamage / 2);
@@ -2424,6 +2655,7 @@ export default function RogueTdPage() {
             delayMs: 180,
             durationMs: 140,
             effectType: "normal",
+            appliesBleed,
           });
           projectilesRef.current.push({
             id: nextProjectile.current++,
@@ -2480,6 +2712,7 @@ export default function RogueTdPage() {
             delayMs: 180,
             durationMs: 180,
             effectType,
+            skillAttack: swordsmanCombo,
           });
         }
       }
@@ -2523,6 +2756,13 @@ export default function RogueTdPage() {
         targetId: null,
         lastAttackTimeMs: undefined,
         stunnedUntilMs: undefined,
+        activeSkillCooldownMs: undefined,
+        skillEffectUntilMs: undefined,
+        adrenalinePhase: undefined,
+        adrenalinePhaseUntilMs: undefined,
+        frozenOrbCell: undefined,
+        frozenOrbUntilMs: undefined,
+        frozenOrbNextTickMs: undefined,
       }));
       unitsRef.current = restedUnits;
       setUnits(restedUnits);

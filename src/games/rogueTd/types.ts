@@ -67,6 +67,13 @@ export interface Unit {
   facing?: "left" | "right";
   stunnedUntilMs?: number;
   protected?: boolean;
+  activeSkillCooldownMs?: number;
+  skillEffectUntilMs?: number;
+  adrenalinePhase?: "boost" | "fatigue";
+  adrenalinePhaseUntilMs?: number;
+  frozenOrbCell?: number;
+  frozenOrbUntilMs?: number;
+  frozenOrbNextTickMs?: number;
 }
 
 export interface Monster {
@@ -97,6 +104,11 @@ export interface Monster {
   burnHitTriggered?: boolean;
   burnEffectUntilMs?: number;
   sniperImpactUntilMs?: number;
+  bleedUntilMs?: number;
+  bleedNextTickMs?: number;
+  bleedSourceUnitId?: number;
+  magicMarkUntilMs?: number;
+  chainHitUntilMs?: number;
   summonedByBossId?: number;
   noKillGold?: boolean;
   stage05BeingAbsorbed?: boolean;
@@ -149,4 +161,6 @@ export interface Projectile {
   delayMs: number; // 공격 모션의 타격 프레임까지 발사를 기다리는 시간
   durationMs: number;
   effectType?: "normal" | "magic_swordsman" | "fire" | "ice" | "lightning" | "sniper" | "shotgun";
+  appliesBleed?: boolean;
+  skillAttack?: boolean;
 }

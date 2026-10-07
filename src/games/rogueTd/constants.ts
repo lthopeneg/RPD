@@ -198,6 +198,25 @@ export const FIRE_AREA_CHANCE = 0.30;
 export const ICE_SLOW_CHANCE = 0.10;
 export const LIGHTNING_PARALYZE_CHANCE = 0.15;
 export const SNIPER_EXECUTE_CHANCE = 0.05;
+export const SWORDSMAN_COMBO_COOLDOWN_MS = 8000;
+export const SWORDSMAN_COMBO_DAMAGE_RATIO = 2.2;
+export const DUAL_BLEED_CHANCE = 0.2;
+export const DUAL_BLEED_DURATION_MS = 3000;
+export const DUAL_BLEED_TICK_MS = 1000;
+export const DUAL_BLEED_MAX_TICK_DAMAGE = 30;
+export const MAGIC_MARK_CHANCE = 0.15;
+export const MAGIC_MARK_DURATION_MS = 6000;
+export const FIRE_SPLASH_RATIO = 0.2;
+export const FROZEN_ORB_COOLDOWN_MS = 12000;
+export const FROZEN_ORB_DURATION_MS = 6000;
+export const FROZEN_ORB_TICK_MS = 1500;
+export const CHAIN_LIGHTNING_COOLDOWN_MS = 9000;
+export const RIFLE_ADRENALINE_READY_MS = 10000;
+export const RIFLE_ADRENALINE_BOOST_MS = 4000;
+export const RIFLE_ADRENALINE_FATIGUE_MS = 2000;
+export const RIFLE_ADRENALINE_CYCLE_MS = 16000;
+export const SHOTGUN_BARRAGE_COOLDOWN_MS = 8000;
+export const SHOTGUN_BARRAGE_RADIUS_TILES = 1.8;
 
 // 신규 룰 관련 상수
 export const MAX_MONSTER_LAPS = 5; // 5회 완주 시 즉시 게임 오버
