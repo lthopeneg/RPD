@@ -1272,7 +1272,9 @@ export default function RogueTdPage() {
       lastAttackTimeMs: undefined,
       stunnedUntilMs: undefined,
       activeSkillCooldownMs: unit.tier >= 2
-        ? ACTIVE_SKILL_INITIAL_COOLDOWN[unit.typeId]
+        ? ACTIVE_SKILL_INITIAL_COOLDOWN[unit.typeId] === undefined
+          ? undefined
+          : 0
         : undefined,
       skillEffectUntilMs: undefined,
       adrenalinePhase: undefined,
@@ -2502,10 +2504,16 @@ export default function RogueTdPage() {
             unit.adrenalinePhase = "boost";
             unit.adrenalinePhaseUntilMs = gameNow + RIFLE_ADRENALINE_BOOST_MS;
             unit.activeSkillCooldownMs = RIFLE_ADRENALINE_CYCLE_MS;
-            unit.skillEffectUntilMs = gameNow + 500;
           } else if (unit.typeId === "ice_mage") {
-            const targetRouteForOrb = target.route ?? path;
-            unit.frozenOrbCell = targetRouteForOrb[Math.min(target.pathStep, targetRouteForOrb.length - 1)] ?? start;
+            const [unitRow, unitCol] = toRC(unit.cell);
+            unit.frozenOrbCell = path.reduce((closestCell, pathCell) => {
+              const [pathRow, pathCol] = toRC(pathCell);
+              const [closestRow, closestCol] = toRC(closestCell);
+              return Math.hypot(pathRow - unitRow, pathCol - unitCol) <
+                Math.hypot(closestRow - unitRow, closestCol - unitCol)
+                ? pathCell
+                : closestCell;
+            }, path[0] ?? start);
             unit.frozenOrbUntilMs = gameNow + FROZEN_ORB_DURATION_MS;
             unit.frozenOrbNextTickMs = gameNow;
             unit.activeSkillCooldownMs = FROZEN_ORB_COOLDOWN_MS;
@@ -2567,7 +2575,7 @@ export default function RogueTdPage() {
         ) {
           calculatedDamage = Math.max(1, Math.round(calculatedDamage * SWORDSMAN_COMBO_DAMAGE_RATIO));
           unit.activeSkillCooldownMs = SWORDSMAN_COMBO_COOLDOWN_MS;
-          unit.skillEffectUntilMs = gameNow + 520;
+          target.swordsmanComboHitUntilMs = gameNow + 500;
           swordsmanCombo = true;
         }
 
@@ -2619,7 +2627,8 @@ export default function RogueTdPage() {
         if (
           unit.tier >= 2 &&
           unit.typeId === "shotgunner" &&
-          (unit.activeSkillCooldownMs ?? 1) <= 0
+          (unit.activeSkillCooldownMs ?? 1) <= 0 &&
+          inRange.length >= 5
         ) {
           monstersRef.current.forEach((monster) => {
             if (monster.hp <= 0) return;

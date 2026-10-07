@@ -21,7 +21,7 @@ import type { SynergyState } from "../../games/rogueTd/synergies";
 import { getUpgradeLevels } from "../../games/rogueTd/upgrades";
 import type { DamageUpgrade } from "../../games/rogueTd/upgrades";
 import type { StorageUnit } from "../../games/rogueTd/types";
-import { UNIT_PORTRAIT_CLASSES } from "../../games/rogueTd/unitSprites";
+import { UNIT_PORTRAIT_CLASSES, UNIT_TIER2_SKILL_ICONS } from "../../games/rogueTd/unitSprites";
 
 interface Props {
   unit: StorageUnit | null;
@@ -80,15 +80,15 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
   })();
   const tierTwoSkill = (() => {
     if (unit.tier < 2) return null;
-    if (unit.typeId === "swordsman") return <><b>연속베기 · 액티브</b><span>8초마다 다음 공격으로 총 220% 피해</span></>;
-    if (unit.typeId === "dual_swordsman") return <><b>혈흔 · 패시브</b><span>공격 시 20% 확률로 3초 출혈(매초 최대 체력 2%, 틱당 최대 30)</span></>;
-    if (unit.typeId === "magic_swordsman") return <><b>마력각인 · 패시브</b><span>공격 시 15% 확률로 6초간 받는 피해 증가(일반 10%, 보스 5%)</span></>;
-    if (unit.typeId === "fire_mage") return <><b>불씨 확산 · 패시브</b><span>기본 공격이 주변 적에게 20% 피해</span></>;
-    if (unit.typeId === "ice_mage") return <><b>프로즌 오브 · 액티브</b><span>12초마다 6초간 주변을 타격하는 얼음 구체 설치</span></>;
-    if (unit.typeId === "lightning_mage") return <><b>체인 라이트닝 · 액티브</b><span>9초마다 최대 6명에게 전이되는 연쇄 번개</span></>;
-    if (unit.typeId === "rifleman") return <><b>아드레날린 · 액티브</b><span>4초간 공격속도 3배, 이후 2초간 0.5배</span></>;
-    if (unit.typeId === "shotgunner") return <><b>전탄 사격 · 액티브</b><span>8초마다 자신 주변 원형 범위에 산탄 발사</span></>;
-    return <><b>매의 눈 · 패시브</b><span>2.5칸 이상 떨어진 대상에게 피해 20% 증가</span></>;
+    if (unit.typeId === "swordsman") return { name: "연속베기 · 액티브", description: "8초마다 다음 공격이 연속베기로 변경되어 총 220% 피해를 줍니다." };
+    if (unit.typeId === "dual_swordsman") return { name: "혈흔 · 패시브", description: "공격 시 20% 확률로 3초간 출혈을 남깁니다. 매초 최대 체력의 2% 피해를 주며 틱당 최대 피해는 30입니다." };
+    if (unit.typeId === "magic_swordsman") return { name: "마력각인 · 패시브", description: "공격 시 15% 확률로 6초간 각인을 남겨 받는 피해를 증가시킵니다. 일반 적은 10%, 보스는 5% 증가합니다." };
+    if (unit.typeId === "fire_mage") return { name: "불씨 확산 · 패시브", description: "기본 공격이 주 대상 주변의 적에게도 20% 피해를 줍니다." };
+    if (unit.typeId === "ice_mage") return { name: "프로즌 오브 · 액티브", description: "12초마다 6초간 유지되는 프로즌 오브를 설치합니다. 둔화·마비 상태의 적에게 더 큰 피해를 줍니다." };
+    if (unit.typeId === "lightning_mage") return { name: "체인 라이트닝 · 액티브", description: "9초마다 최대 6명의 적에게 전이되는 번개를 발사하며 각 대상에게 마비를 판정합니다." };
+    if (unit.typeId === "rifleman") return { name: "아드레날린 · 액티브", description: "4초간 공격속도가 3배가 되고, 이후 2초간 0.5배로 감소합니다." };
+    if (unit.typeId === "shotgunner") return { name: "전탄 사격 · 액티브", description: "재사용 대기시간이 끝나고 자신의 공격 범위 안에 적이 5마리 이상이면, 주변 원형 범위에 산탄을 발사합니다." };
+    return { name: "매의 눈 · 패시브", description: "2.5칸 이상 떨어진 대상에게 주는 피해가 20% 증가합니다. 즉사 확률은 증가하지 않습니다." };
   })();
 
   return (
@@ -113,7 +113,18 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
           <div><dt>{specTarget} 피해</dt><dd>{specBonus > 0 ? <b className="synergyStat">+{percent(specBonus)}</b> : "없음"}</dd></div>
         </dl>
         <div className="unitSpecialEffect"><strong>특수효과</strong><p>{specialEffect}</p></div>
-        {tierTwoSkill && <div className="unitTierSkill"><strong>2성 스킬</strong><p>{tierTwoSkill}</p></div>}
+        {tierTwoSkill && (
+          <div className="unitTierSkill">
+            <strong>스킬</strong>
+            <span className="unitSkillIcon" tabIndex={0} aria-label={`${tierTwoSkill.name}: ${tierTwoSkill.description}`}>
+              <img src={UNIT_TIER2_SKILL_ICONS[unit.typeId]} alt={tierTwoSkill.name} />
+              <span className="unitSkillTooltip" role="tooltip">
+                <b>{tierTwoSkill.name}</b>
+                <em>{tierTwoSkill.description}</em>
+              </span>
+            </span>
+          </div>
+        )}
       </div>
     </section>
   );

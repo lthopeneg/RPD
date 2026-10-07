@@ -35,3 +35,15 @@ export const UNIT_PORTRAIT_CLASSES: Record<UnitTypeId, string> = {
   shotgunner: "shotgunnerPortrait",
   sniper: "sniperPortrait",
 };
+
+export const UNIT_TIER2_SKILL_ICONS: Record<UnitTypeId, string> = {
+  swordsman: new URL("../../images/tier2-skill-icon-swordsman.png", import.meta.url).href,
+  dual_swordsman: new URL("../../images/tier2-skill-icon-dual_swordsman.png", import.meta.url).href,
+  magic_swordsman: new URL("../../images/tier2-skill-icon-magic_swordsman.png", import.meta.url).href,
+  fire_mage: new URL("../../images/tier2-skill-icon-fire_mage.png", import.meta.url).href,
+  ice_mage: new URL("../../images/tier2-skill-icon-ice_mage.png", import.meta.url).href,
+  lightning_mage: new URL("../../images/tier2-skill-icon-lightning_mage.png", import.meta.url).href,
+  rifleman: new URL("../../images/tier2-skill-icon-rifleman.png", import.meta.url).href,
+  shotgunner: new URL("../../images/tier2-skill-icon-shotgunner.png", import.meta.url).href,
+  sniper: new URL("../../images/tier2-skill-icon-sniper.png", import.meta.url).href,
+};

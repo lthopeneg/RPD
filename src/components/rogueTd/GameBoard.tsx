@@ -12,6 +12,7 @@ import {
   ROWS,
   RIFLE_ADRENALINE_CYCLE_MS,
   SHOTGUN_BARRAGE_COOLDOWN_MS,
+  SHOTGUN_BARRAGE_RADIUS_TILES,
   SWORDSMAN_COMBO_COOLDOWN_MS,
   STAGE05_ABSORB_CAST_MS,
   STAGE05_SUMMON_CAST_MS,
@@ -26,7 +27,7 @@ import {
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { DamageUpgrade } from "../../games/rogueTd/upgrades";
 import { getUpgradeLevels } from "../../games/rogueTd/upgrades";
-import { UNIT_EFFECT_CLASSES, UNIT_SPRITE_CLASSES } from "../../games/rogueTd/unitSprites";
+import { UNIT_EFFECT_CLASSES, UNIT_SPRITE_CLASSES, UNIT_TIER2_SKILL_ICONS } from "../../games/rogueTd/unitSprites";
 import UnitTooltip from "./UnitTooltip";
 
 const START_POINT_IMAGE = new URL("../../images/start-point.png", import.meta.url).href;
@@ -39,16 +40,16 @@ const ROAD_STRAIGHT_IMAGE = new URL("../../images/road-straight.png", import.met
 const ROAD_CORNER_IMAGE = new URL("../../images/road-corner.png", import.meta.url).href;
 const ROAD_THREEWAY_IMAGE = new URL("../../images/road-threeway.png", import.meta.url).href;
 const ROAD_FOURWAY_IMAGE = new URL("../../images/road-fourway.png", import.meta.url).href;
-const FROZEN_ORB_EFFECT_IMAGE = new URL("../../images/frozen-orb-effect.png", import.meta.url).href;
-const BLEED_EFFECT_IMAGE = new URL("../../images/bleed-effect.png", import.meta.url).href;
-const MAGIC_MARK_EFFECT_IMAGE = new URL("../../images/magic-mark-effect.png", import.meta.url).href;
-const CHAIN_LIGHTNING_EFFECT_IMAGE = new URL("../../images/chain-lightning-effect.png", import.meta.url).href;
-const ACTIVE_SKILL_ICONS: Partial<Record<Unit["typeId"], string>> = {
-  swordsman: new URL("../../images/skill-combo.png", import.meta.url).href,
-  ice_mage: new URL("../../images/skill-frozen-orb.png", import.meta.url).href,
-  lightning_mage: new URL("../../images/skill-chain-lightning.png", import.meta.url).href,
-  rifleman: new URL("../../images/skill-adrenaline.png", import.meta.url).href,
-  shotgunner: new URL("../../images/skill-barrage.png", import.meta.url).href,
+const FROZEN_ORB_EFFECT_IMAGE = UNIT_TIER2_SKILL_ICONS.ice_mage;
+const BLEED_EFFECT_IMAGE = new URL("../../images/bleed-skill-sheet.png", import.meta.url).href;
+const MAGIC_MARK_EFFECT_IMAGE = new URL("../../images/magic-mark-skill-sheet.png", import.meta.url).href;
+const CHAIN_LIGHTNING_EFFECT_IMAGE = new URL("../../images/chain-lightning-skill-sheet.png", import.meta.url).href;
+const ACTIVE_SKILL_VFX: Partial<Record<Unit["typeId"], string>> = {
+  swordsman: new URL("../../images/combo-skill-sheet.png", import.meta.url).href,
+  ice_mage: new URL("../../images/frozen-orb-skill-sheet.png", import.meta.url).href,
+  lightning_mage: CHAIN_LIGHTNING_EFFECT_IMAGE,
+  rifleman: new URL("../../images/adrenaline-skill-sheet.png", import.meta.url).href,
+  shotgunner: new URL("../../images/barrage-skill-sheet.png", import.meta.url).href,
 };
 const ACTIVE_SKILL_COOLDOWNS: Partial<Record<Unit["typeId"], number>> = {
   swordsman: SWORDSMAN_COMBO_COOLDOWN_MS,
@@ -319,7 +320,7 @@ export default function GameBoard(p: Props) {
           const pathPulseOrder = pathIndex === undefined ? -1 : pathIndex - pathPulseStart;
           const showPathPulse = p.pathVisible && pathPulseOrder >= 0 && pathPulseOrder < 3;
           const spriteClass = u ? UNIT_SPRITE_CLASSES[u.typeId] : null;
-          const activeSkillIcon = u ? ACTIVE_SKILL_ICONS[u.typeId] : undefined;
+          const activeSkillIcon = u ? UNIT_TIER2_SKILL_ICONS[u.typeId] : undefined;
           const activeSkillCooldown = u ? ACTIVE_SKILL_COOLDOWNS[u.typeId] : undefined;
           const activeSkillRemaining = u?.activeSkillCooldownMs ?? 0;
           const activeSkillProgress = activeSkillCooldown
@@ -328,6 +329,14 @@ export default function GameBoard(p: Props) {
           const attackAge = u?.lastAttackTimeMs === undefined
             ? Number.POSITIVE_INFINITY
             : now - u.lastAttackTimeMs;
+          const attackMotionSpeed = u?.typeId === "rifleman"
+            ? u.adrenalinePhase === "boost"
+              ? 3
+              : u.adrenalinePhase === "fatigue"
+                ? 0.5
+                : 1
+            : 1;
+          const attackAnimationGameMs = 360 / attackMotionSpeed;
           const isStunned = Boolean(
             u?.stunnedUntilMs && now < u.stunnedUntilMs,
           );
@@ -393,9 +402,13 @@ export default function GameBoard(p: Props) {
               )}
 
               {u && (
-                <div className={`unitWrapper ${isStunned ? "stunned" : ""}`} key={u.id}>
-                  {u.skillEffectUntilMs !== undefined && now < u.skillEffectUntilMs && (
-                    <span className={`tierTwoSkillBurst skill-${u.typeId}`} aria-hidden="true" />
+                <div className={`unitWrapper ${isStunned ? "stunned" : ""} ${u.adrenalinePhase === "boost" ? "adrenalineBoost" : ""} ${u.adrenalinePhase === "fatigue" ? "adrenalineFatigue" : ""}`} key={u.id}>
+                  {u.typeId !== "shotgunner" && u.skillEffectUntilMs !== undefined && now < u.skillEffectUntilMs && (
+                    <span
+                      className={`tierTwoSkillBurst skill-${u.typeId}`}
+                      style={{ backgroundImage: `url(${ACTIVE_SKILL_VFX[u.typeId]})` }}
+                      aria-hidden="true"
+                    />
                   )}
                   {u.tier >= 2 && activeSkillIcon && activeSkillCooldown && (
                     <span
@@ -405,7 +418,12 @@ export default function GameBoard(p: Props) {
                     >
                       <img src={activeSkillIcon} alt="" />
                       <i aria-hidden="true" />
-                      <b>{activeSkillRemaining <= 0 ? "!" : Math.ceil(activeSkillRemaining / 1000)}</b>
+                      {activeSkillRemaining > 0 && <b>{Math.ceil(activeSkillRemaining / 1000)}</b>}
+                    </span>
+                  )}
+                  {u.typeId === "rifleman" && u.adrenalinePhase && (
+                    <span className={`rifleAdrenalineStatus ${u.adrenalinePhase}`} aria-hidden="true">
+                      <i />
                     </span>
                   )}
                   {u.tier >= 2 && (
@@ -442,7 +460,9 @@ export default function GameBoard(p: Props) {
                   )}
                   {spriteClass ? (
                     <span
-                      className={`unit ${spriteClass} ${u.facing === "left" ? "facingLeft" : ""} ${!isStunned && attackAge >= 0 && attackAge < 360 ? "attacking" : ""}`}
+                      key={`${u.id}-${u.lastAttackTimeMs ?? 0}`}
+                      className={`unit ${spriteClass} ${u.facing === "left" ? "facingLeft" : ""} ${!isStunned && attackAge >= 0 && attackAge < attackAnimationGameMs ? "attacking" : ""}`}
+                      style={{ animationDuration: `${attackAnimationGameMs / p.animationSpeed}ms` }}
                       role="img"
                       aria-label={UNIT_TYPES[u.typeId].name}
                     />
@@ -481,22 +501,62 @@ export default function GameBoard(p: Props) {
         })}
 
         {p.units
+          .filter((unit) =>
+            unit.typeId === "shotgunner" &&
+            unit.skillEffectUntilMs !== undefined &&
+            now < unit.skillEffectUntilMs
+          )
+          .map((unit) => {
+            const effectLeft = `${(((unit.cell % COLS) + 0.5) / COLS) * 100}%`;
+            const effectTop = `${((Math.floor(unit.cell / COLS) + 0.5) / ROWS) * 100}%`;
+            const effectSize = `${((SHOTGUN_BARRAGE_RADIUS_TILES * 2) / COLS) * 100}%`;
+            return (
+              <span
+                key={`shotgun-barrage-${unit.id}-${unit.skillEffectUntilMs}`}
+                className="shotgunBarrageArea"
+                style={{
+                  left: effectLeft,
+                  top: effectTop,
+                  width: effectSize,
+                  animationDuration: `${520 / p.animationSpeed}ms`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                }}
+                aria-hidden="true"
+              >
+                <i style={{ backgroundImage: `url(${ACTIVE_SKILL_VFX.shotgunner})` }} />
+              </span>
+            );
+          })}
+
+        {p.units
           .filter((unit) => unit.frozenOrbCell !== undefined && unit.frozenOrbUntilMs !== undefined && now < unit.frozenOrbUntilMs)
           .map((unit) => {
             const cell = unit.frozenOrbCell!;
+            const orbLeft = `${(((cell % COLS) + 0.5) / COLS) * 100}%`;
+            const orbTop = `${((Math.floor(cell / COLS) + 0.5) / ROWS) * 100}%`;
             return (
-              <img
-                key={`orb-${unit.id}`}
-                className="frozenOrbEffect"
-                src={FROZEN_ORB_EFFECT_IMAGE}
-                alt=""
-                style={{
-                  left: `${(((cell % COLS) + 0.5) / COLS) * 100}%`,
-                  top: `${((Math.floor(cell / COLS) + 0.5) / ROWS) * 100}%`,
-                  animationDuration: `${900 / p.animationSpeed}ms`,
-                  animationPlayState: p.animationPaused ? "paused" : "running",
-                }}
-              />
+              <div key={`orb-${unit.id}`} className="frozenOrbLayer">
+                <span
+                  className="frozenOrbRange"
+                  style={{
+                    left: orbLeft,
+                    top: orbTop,
+                    width: `${(3 / COLS) * 100}%`,
+                    animationDuration: `${1500 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                />
+                <span
+                  className="frozenOrbEffect"
+                  style={{
+                    backgroundImage: `url(${FROZEN_ORB_EFFECT_IMAGE})`,
+                    left: orbLeft,
+                    top: orbTop,
+                    animationDuration: `${900 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                />
+              </div>
             );
           })}
 
@@ -793,6 +853,7 @@ export default function GameBoard(p: Props) {
           const isBleeding = m.bleedUntilMs !== undefined && now < m.bleedUntilMs;
           const isMagicMarked = m.magicMarkUntilMs !== undefined && now < m.magicMarkUntilMs;
           const isChainHit = m.chainHitUntilMs !== undefined && now < m.chainHitUntilMs;
+          const isSwordsmanComboHit = m.swordsmanComboHitUntilMs !== undefined && now < m.swordsmanComboHitUntilMs;
 
           const displayedMaxHp = m.bossStage === 15 && stage15State !== "phoenix"
             ? m.stage15EggMaxHp ?? m.maxHp
@@ -817,7 +878,7 @@ export default function GameBoard(p: Props) {
           return (
             <span
               key={m.id}
-              className={`monster ${m.category} ${m.isBoss ? "boss" : ""} ${m.id === p.selectedBossId ? "selectedBoss" : ""} ${m.isFinalBoss ? "finalBoss" : ""} ${isFinalBossPhase1 ? "finalBossPhase1Test" : ""} ${isFinalBossPhase2 ? "finalBossPhase2Test" : ""} ${isFinalBossPhase3 ? "finalBossPhase3Test" : ""} ${isFinalBossPhase4 ? "finalBossPhase4Test" : ""} ${m.summonedByBossId !== undefined ? "stage05Skeleton" : ""} ${m.stage05BeingAbsorbed ? "stage05BeingAbsorbed" : ""} ${m.stage05ShieldActive ? "stage05SummonShield" : ""} ${isStage05Summoning ? "stage05Summoning" : ""} ${isStage05Absorbing ? "stage05Absorbing" : ""} ${m.bossStage === 15 ? `stage15-${stage15State}` : ""} ${isStage20Charging ? "stage20Charging" : ""} ${isStage20Shielded ? "stage20Shielded" : ""} ${isStage20Stunned ? "stage20Stunned" : ""} ${isStage20ShieldBreaking ? "stage20ShieldBreaking" : ""} ${isStage30Teleporting ? "stage30Teleporting" : ""} ${isStage30Weak ? "stage30Weak" : ""} ${isHit ? "hitFlash" : ""} ${isBurning ? "burning" : ""} ${isBossSniperHit ? "bossSniperHit" : ""} ${
+              className={`monster ${m.category} ${m.isBoss ? "boss" : ""} ${m.id === p.selectedBossId ? "selectedBoss" : ""} ${m.isFinalBoss ? "finalBoss" : ""} ${isFinalBossPhase1 ? "finalBossPhase1Test" : ""} ${isFinalBossPhase2 ? "finalBossPhase2Test" : ""} ${isFinalBossPhase3 ? "finalBossPhase3Test" : ""} ${isFinalBossPhase4 ? "finalBossPhase4Test" : ""} ${m.summonedByBossId !== undefined ? "stage05Skeleton" : ""} ${m.stage05BeingAbsorbed ? "stage05BeingAbsorbed" : ""} ${m.stage05ShieldActive ? "stage05SummonShield" : ""} ${isStage05Summoning ? "stage05Summoning" : ""} ${isStage05Absorbing ? "stage05Absorbing" : ""} ${m.bossStage === 15 ? `stage15-${stage15State}` : ""} ${isStage20Charging ? "stage20Charging" : ""} ${isStage20Shielded ? "stage20Shielded" : ""} ${isStage20Stunned ? "stage20Stunned" : ""} ${isStage20ShieldBreaking ? "stage20ShieldBreaking" : ""} ${isStage30Teleporting ? "stage30Teleporting" : ""} ${isStage30Weak ? "stage30Weak" : ""} ${isSwordsmanComboHit ? "swordsmanComboTarget" : ""} ${isHit ? "hitFlash" : ""} ${isBurning ? "burning" : ""} ${isBossSniperHit ? "bossSniperHit" : ""} ${
                 isParalyzed ? "paralyzed" : isSlow ? "slowed" : ""
               }`}
               style={{
@@ -949,9 +1010,10 @@ export default function GameBoard(p: Props) {
                   aria-hidden="true"
                 />
               )}
-              {isBleeding && <img className="monsterSkillStatus bleed" src={BLEED_EFFECT_IMAGE} alt="출혈" />}
-              {isMagicMarked && <img className="monsterSkillStatus magicMark" src={MAGIC_MARK_EFFECT_IMAGE} alt="마력각인" />}
-              {isChainHit && <img className="monsterChainHit" src={CHAIN_LIGHTNING_EFFECT_IMAGE} alt="" />}
+              {isBleeding && <span className={`monsterSkillStatus bleed ${isMagicMarked ? "paired" : ""}`} style={{ backgroundImage: `url(${BLEED_EFFECT_IMAGE})` }} aria-label="출혈" />}
+              {isMagicMarked && <span className={`monsterSkillStatus magicMark ${isBleeding ? "paired" : ""}`} style={{ backgroundImage: `url(${MAGIC_MARK_EFFECT_IMAGE})` }} aria-label="마력각인" />}
+              {isSwordsmanComboHit && <span className="monsterSwordsmanComboHit" style={{ backgroundImage: `url(${ACTIVE_SKILL_VFX.swordsman})` }} aria-hidden="true" />}
+              {isChainHit && <span className="monsterChainHit" style={{ backgroundImage: `url(${CHAIN_LIGHTNING_EFFECT_IMAGE})` }} aria-hidden="true" />}
               <span
                 className={`monsterSprite ${m.isBoss ? "bossSprite" : ""} ${displayedSpriteClass} move-${moveDirection}`}
                 style={{

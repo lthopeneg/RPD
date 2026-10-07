@@ -109,6 +109,7 @@ export interface Monster {
   bleedSourceUnitId?: number;
   magicMarkUntilMs?: number;
   chainHitUntilMs?: number;
+  swordsmanComboHitUntilMs?: number;
   summonedByBossId?: number;
   noKillGold?: boolean;
   stage05BeingAbsorbed?: boolean;
