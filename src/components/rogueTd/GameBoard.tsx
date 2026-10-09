@@ -13,7 +13,12 @@ import {
   RIFLE_ADRENALINE_CYCLE_MS,
   SHOTGUN_BARRAGE_COOLDOWN_MS,
   SHOTGUN_BARRAGE_RADIUS_TILES,
+  DUAL_BLOOD_FLURRY_COOLDOWN_MS,
+  MAGIC_MARK_FIELD_COOLDOWN_MS,
+  FIRE_PILLAR_COOLDOWN_MS,
+  SNIPER_KILL_SHOT_COOLDOWN_MS,
   SWORDSMAN_COMBO_COOLDOWN_MS,
+  TIER3_SWORDSMAN_COMBO_COOLDOWN_MS,
   STAGE05_ABSORB_CAST_MS,
   STAGE05_SUMMON_CAST_MS,
   STAGE10_STOMP_RADIUS_TILES,
@@ -27,7 +32,7 @@ import {
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { DamageUpgrade } from "../../games/rogueTd/upgrades";
 import { getUpgradeLevels } from "../../games/rogueTd/upgrades";
-import { UNIT_EFFECT_CLASSES, UNIT_SPRITE_CLASSES, UNIT_TIER2_SKILL_ICONS } from "../../games/rogueTd/unitSprites";
+import { UNIT_EFFECT_CLASSES, UNIT_SPRITE_CLASSES, UNIT_TIER2_SKILL_ICONS, UNIT_TIER3_SKILL_ICONS } from "../../games/rogueTd/unitSprites";
 import UnitTooltip from "./UnitTooltip";
 
 const START_POINT_IMAGE = new URL("../../images/start-point.png", import.meta.url).href;
@@ -44,6 +49,22 @@ const FROZEN_ORB_EFFECT_IMAGE = UNIT_TIER2_SKILL_ICONS.ice_mage;
 const BLEED_EFFECT_IMAGE = new URL("../../images/bleed-skill-sheet.png", import.meta.url).href;
 const MAGIC_MARK_EFFECT_IMAGE = new URL("../../images/magic-mark-skill-sheet.png", import.meta.url).href;
 const CHAIN_LIGHTNING_EFFECT_IMAGE = new URL("../../images/chain-lightning-skill-sheet.png", import.meta.url).href;
+const TIER3_MAGE_VFX = {
+  fire: new URL("../../images/tier3-mage-vfx-fire.png", import.meta.url).href,
+  ice: new URL("../../images/tier3-mage-vfx-ice.png", import.meta.url).href,
+  lightning: new URL("../../images/tier3-mage-vfx-lightning.png", import.meta.url).href,
+};
+const TIER3_WARRIOR_VFX: Record<"swordsman" | "dual_swordsman" | "magic_swordsman", string> = {
+  swordsman: new URL("../../images/tier3-warrior-vfx-swordsman.png", import.meta.url).href,
+  dual_swordsman: new URL("../../images/tier3-warrior-vfx-dual_swordsman.png", import.meta.url).href,
+  magic_swordsman: new URL("../../images/tier3-warrior-vfx-magic_swordsman.png", import.meta.url).href,
+};
+const TIER3_RANGER_VFX = {
+  rifleman: new URL("../../images/tier3-ranger-vfx-rifleman.png", import.meta.url).href,
+  shotgunner: new URL("../../images/tier3-ranger-vfx-shotgunner.png", import.meta.url).href,
+  sniper: new URL("../../images/tier3-ranger-vfx-sniper.png", import.meta.url).href,
+} as const;
+const TIER3_FIRE_PILLAR_LOOP_VFX = new URL("../../images/tier3-mage-vfx-fire-loop.png", import.meta.url).href;
 const ACTIVE_SKILL_VFX: Partial<Record<Unit["typeId"], string>> = {
   swordsman: new URL("../../images/combo-skill-sheet.png", import.meta.url).href,
   ice_mage: new URL("../../images/frozen-orb-skill-sheet.png", import.meta.url).href,
@@ -57,7 +78,17 @@ const ACTIVE_SKILL_COOLDOWNS: Partial<Record<Unit["typeId"], number>> = {
   lightning_mage: CHAIN_LIGHTNING_COOLDOWN_MS,
   rifleman: RIFLE_ADRENALINE_CYCLE_MS,
   shotgunner: SHOTGUN_BARRAGE_COOLDOWN_MS,
+  dual_swordsman: DUAL_BLOOD_FLURRY_COOLDOWN_MS,
+  magic_swordsman: MAGIC_MARK_FIELD_COOLDOWN_MS,
+  fire_mage: FIRE_PILLAR_COOLDOWN_MS,
+  sniper: SNIPER_KILL_SHOT_COOLDOWN_MS,
 };
+const TIER3_ACTIVE_SKILL_TYPES = new Set<Unit["typeId"]>([
+  "dual_swordsman",
+  "magic_swordsman",
+  "fire_mage",
+  "sniper",
+]);
 
 function getRoadTile(cellIndex: number, pathCells: Set<number>) {
   if (!pathCells.has(cellIndex)) return { src: ROAD_GRASS_IMAGE, rotation: 0 };
@@ -103,6 +134,7 @@ interface Props {
   onCellClick: (i: number) => void;
   onBossClick: (monsterId: number) => void;
   projectiles: Projectile[];
+  tier3FirePillars: Array<{ id: number; row: number; col: number; damageRowStart: number; damageColStart: number; untilMs: number }>;
   gameNowMs: number;
   animationPaused: boolean;
   animationSpeed: 1 | 2;
@@ -320,8 +352,16 @@ export default function GameBoard(p: Props) {
           const pathPulseOrder = pathIndex === undefined ? -1 : pathIndex - pathPulseStart;
           const showPathPulse = p.pathVisible && pathPulseOrder >= 0 && pathPulseOrder < 3;
           const spriteClass = u ? UNIT_SPRITE_CLASSES[u.typeId] : null;
-          const activeSkillIcon = u ? UNIT_TIER2_SKILL_ICONS[u.typeId] : undefined;
-          const activeSkillCooldown = u ? ACTIVE_SKILL_COOLDOWNS[u.typeId] : undefined;
+          const activeSkillIcon = u
+            ? u.tier >= 3 && TIER3_ACTIVE_SKILL_TYPES.has(u.typeId)
+              ? UNIT_TIER3_SKILL_ICONS[u.typeId]
+              : UNIT_TIER2_SKILL_ICONS[u.typeId]
+            : undefined;
+          const activeSkillCooldown = u
+            ? u.typeId === "swordsman" && u.tier >= 3
+              ? TIER3_SWORDSMAN_COMBO_COOLDOWN_MS
+              : ACTIVE_SKILL_COOLDOWNS[u.typeId]
+            : undefined;
           const activeSkillRemaining = u?.activeSkillCooldownMs ?? 0;
           const activeSkillProgress = activeSkillCooldown
             ? Math.max(0, Math.min(1, 1 - activeSkillRemaining / activeSkillCooldown))
@@ -403,14 +443,14 @@ export default function GameBoard(p: Props) {
 
               {u && (
                 <div className={`unitWrapper ${isStunned ? "stunned" : ""} ${u.adrenalinePhase === "boost" ? "adrenalineBoost" : ""} ${u.adrenalinePhase === "fatigue" ? "adrenalineFatigue" : ""}`} key={u.id}>
-                  {u.typeId !== "shotgunner" && u.skillEffectUntilMs !== undefined && now < u.skillEffectUntilMs && (
+                  {u.typeId !== "shotgunner" && u.tier3AreaKind === undefined && u.skillEffectUntilMs !== undefined && now < u.skillEffectUntilMs && (
                     <span
                       className={`tierTwoSkillBurst skill-${u.typeId}`}
                       style={{ backgroundImage: `url(${ACTIVE_SKILL_VFX[u.typeId]})` }}
                       aria-hidden="true"
                     />
                   )}
-                  {u.tier >= 2 && activeSkillIcon && activeSkillCooldown && (
+                  {u.tier >= 2 && u.activeSkillCooldownMs !== undefined && activeSkillIcon && activeSkillCooldown && (
                     <span
                       className={`unitActiveSkill ${activeSkillRemaining <= 0 ? "ready" : ""}`}
                       style={{ "--skill-ready": `${activeSkillProgress * 360}deg` } as CSSProperties}
@@ -501,6 +541,137 @@ export default function GameBoard(p: Props) {
         })}
 
         {p.units
+          .filter((unit) => unit.swordsmanWaveUntilMs !== undefined && now < unit.swordsmanWaveUntilMs)
+          .map((unit) => {
+            const originRow = unit.swordsmanWaveOriginRow ?? Math.floor(unit.cell / COLS);
+            const originCol = unit.swordsmanWaveOriginCol ?? unit.cell % COLS;
+            const directionRow = unit.swordsmanWaveDirectionRow ?? 0;
+            const directionCol = unit.swordsmanWaveDirectionCol ?? 1;
+            const waveLength = unit.swordsmanWaveLength ?? 3;
+            const rotation = Math.atan2(directionRow, directionCol) * 180 / Math.PI;
+            const centerRow = originRow + (directionRow * (waveLength - 1)) / 2;
+            const centerCol = originCol + (directionCol * (waveLength - 1)) / 2;
+            const isDiagonal = directionRow !== 0 && directionCol !== 0;
+            return (
+              <span key={`swordsman-wave-${unit.id}-${unit.swordsmanWaveUntilMs}`} className="swordsmanGroundWave" aria-hidden="true">
+                {Array.from({ length: waveLength }, (_, waveIndex) => {
+                  const row = originRow + directionRow * waveIndex;
+                  const col = originCol + directionCol * waveIndex;
+                  return (
+                    <b
+                      key={waveIndex}
+                      className="swordsmanWaveCell"
+                      style={{
+                        left: `${(col / COLS) * 100}%`,
+                        top: `${(row / ROWS) * 100}%`,
+                        width: `${100 / COLS}%`,
+                        height: `${100 / ROWS}%`,
+                        animationDuration: `${620 / p.animationSpeed}ms`,
+                        animationPlayState: p.animationPaused ? "paused" : "running",
+                      }}
+                    />
+                  );
+                })}
+                <i
+                  className={`swordsmanGroundSlash ${isDiagonal ? "diagonal" : "straight"}`}
+                  style={{
+                    left: `${((centerCol + 0.5) / COLS) * 100}%`,
+                    top: `${((centerRow + 0.5) / ROWS) * 100}%`,
+                    width: `${(waveLength / COLS) * 100}%`,
+                    transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                    backgroundImage: `url(${TIER3_WARRIOR_VFX.swordsman})`,
+                    animationDuration: `${620 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                />
+              </span>
+            );
+          })}
+
+        {p.units
+          .filter((unit) => unit.tier3AreaKind !== undefined && unit.skillEffectUntilMs !== undefined && now < unit.skillEffectUntilMs)
+          .map((unit) => {
+            const radius = unit.tier3AreaKind === "dual_swordsman" ? 2 : 1.8;
+            return (
+              <span
+                key={`warrior-area-${unit.id}-${unit.skillEffectUntilMs}`}
+                className={`warriorSkillArea ${unit.tier3AreaKind}`}
+                style={{
+                  left: `${(((unit.cell % COLS) + 0.5) / COLS) * 100}%`,
+                  top: `${((Math.floor(unit.cell / COLS) + 0.5) / ROWS) * 100}%`,
+                  width: `${((radius * 2) / COLS) * 100}%`,
+                  animationDuration: `${650 / p.animationSpeed}ms`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                }}
+                aria-hidden="true"
+              />
+            );
+          })}
+
+        {p.units
+          .filter((unit) =>
+            unit.tier3RangerEffectKind !== undefined &&
+            unit.tier3RangerEffectUntilMs !== undefined &&
+            now < unit.tier3RangerEffectUntilMs
+          )
+          .map((unit) => {
+            const effectKind = unit.tier3RangerEffectKind!;
+            const effectRow = unit.tier3RangerEffectRow ?? Math.floor(unit.cell / COLS);
+            const effectCol = unit.tier3RangerEffectCol ?? unit.cell % COLS;
+            const duration = effectKind === "sniper" ? 900 : effectKind === "rifleman" ? 720 : 520;
+            const facingClass = unit.facing === "left" ? "facingLeft" : "facingRight";
+            if (effectKind === "shotgunner") {
+              return (
+                <span
+                  key={`tier3-ranger-unit-${unit.id}-${unit.tier3RangerEffectUntilMs}`}
+                  className="tier3ShotgunEffectAnchor"
+                  style={{
+                    left: `${((effectCol + 0.5) / COLS) * 100}%`,
+                    top: `${((effectRow + 0.5) / ROWS) * 100}%`,
+                    marginLeft: unit.facing === "left" ? "-18px" : "18px",
+                    transform: `rotate(${(unit.tier3RangerEffectAngleDeg ?? (unit.facing === "left" ? 180 : 0)) - 180}deg)`,
+                  }}
+                  aria-hidden="true"
+                >
+                  <svg
+                    className="tier3ShotgunRangeFan"
+                    viewBox="0 0 216 216"
+                    preserveAspectRatio="none"
+                    style={{
+                      animationDuration: `${duration / p.animationSpeed}ms`,
+                      animationPlayState: p.animationPaused ? "paused" : "running",
+                    }}
+                  >
+                    <path d="M 185 108 L 110 20 A 116 116 0 0 0 110 196 Z" />
+                  </svg>
+                  <i
+                    className="tier3ShotgunBlast"
+                    style={{
+                      backgroundImage: `url(${TIER3_RANGER_VFX.shotgunner})`,
+                      animationDuration: `${duration / p.animationSpeed}ms`,
+                      animationPlayState: p.animationPaused ? "paused" : "running",
+                    }}
+                  />
+                </span>
+              );
+            }
+            return (
+              <span
+                key={`tier3-ranger-unit-${unit.id}-${unit.tier3RangerEffectUntilMs}`}
+                className={`tier3RangerUnitEffect ${effectKind} ${facingClass}`}
+                style={{
+                  left: `${((effectCol + 0.5) / COLS) * 100}%`,
+                  top: `${((effectRow + 0.5) / ROWS) * 100}%`,
+                  backgroundImage: `url(${TIER3_RANGER_VFX[effectKind]})`,
+                  animationDuration: `${duration / p.animationSpeed}ms`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                }}
+                aria-hidden="true"
+              />
+            );
+          })}
+
+        {p.units
           .filter((unit) =>
             unit.typeId === "shotgunner" &&
             unit.skillEffectUntilMs !== undefined &&
@@ -528,14 +699,112 @@ export default function GameBoard(p: Props) {
             );
           })}
 
+        {p.tier3FirePillars.map((pillar) => (
+          <span key={`tier3-fire-pillar-${pillar.id}`} className="tier3FireComposite" aria-hidden="true">
+            <i
+              className="tier3FirePillarDamageTiles"
+              style={{
+                left: `${(pillar.damageColStart / COLS) * 100}%`,
+                top: `${(pillar.damageRowStart / ROWS) * 100}%`,
+                width: `${(3 / COLS) * 100}%`,
+                height: `${(2 / ROWS) * 100}%`,
+                animationPlayState: p.animationPaused ? "paused" : "running",
+              }}
+            />
+            <span
+              className="tier3FirePillarLayer"
+              style={{
+                left: `${((pillar.col + 0.5) / COLS) * 100}%`,
+                top: `${((pillar.row + 0.5) / ROWS) * 100}%`,
+                width: `${(3 / COLS) * 100}%`,
+                height: `${(2 / ROWS) * 100}%`,
+              }}
+            >
+              <b
+                className="tier3MageVfx tier3FirePillarVfx"
+                style={{
+                  backgroundImage: `url(${TIER3_MAGE_VFX.fire})`,
+                  animationDuration: `${3000 / p.animationSpeed}ms`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                }}
+              />
+              <b
+                className="tier3FirePillarLoopVfx"
+                style={{
+                  backgroundImage: `url(${TIER3_FIRE_PILLAR_LOOP_VFX})`,
+                  "--fire-loop-cycle": `${720 / p.animationSpeed}ms`,
+                  "--fire-total-duration": `${3000 / p.animationSpeed}ms`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                } as CSSProperties}
+              />
+            </span>
+          </span>
+        ))}
+
+        {p.units
+          .filter((unit) => unit.frozenOrbExplosionCell !== undefined && unit.frozenOrbExplosionUntilMs !== undefined && now < unit.frozenOrbExplosionUntilMs)
+          .map((unit) => {
+            const cell = unit.frozenOrbExplosionCell!;
+            const explosionLeft = `${(((cell % COLS) + 0.5) / COLS) * 100}%`;
+            const explosionTop = `${((Math.floor(cell / COLS) + 0.5) / ROWS) * 100}%`;
+            return (
+              <span key={`tier3-ice-explosion-${unit.id}-${unit.frozenOrbExplosionUntilMs}`} className="tier3IceExplosionLayer">
+                <i
+                  className="tier3IceExplosionRange"
+                  style={{
+                    left: explosionLeft,
+                    top: explosionTop,
+                    width: `${((1.8 * 2) / COLS) * 100}%`,
+                    animationDuration: `${760 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                />
+                <b
+                  className="tier3MageVfx tier3IceExplosionVfx"
+                  style={{
+                    left: explosionLeft,
+                    top: explosionTop,
+                    backgroundImage: `url(${TIER3_MAGE_VFX.ice})`,
+                    animationDuration: `${760 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              </span>
+            );
+          })}
+
         {p.units
           .filter((unit) => unit.frozenOrbCell !== undefined && unit.frozenOrbUntilMs !== undefined && now < unit.frozenOrbUntilMs)
           .map((unit) => {
             const cell = unit.frozenOrbCell!;
-            const orbLeft = `${(((cell % COLS) + 0.5) / COLS) * 100}%`;
-            const orbTop = `${((Math.floor(cell / COLS) + 0.5) / ROWS) * 100}%`;
+            const pathPosition = unit.tier >= 3 ? unit.frozenOrbPathPosition : undefined;
+            const pathFloor = pathPosition === undefined ? -1 : Math.floor(pathPosition);
+            const pathCeil = pathPosition === undefined ? -1 : Math.min(p.path.length - 1, Math.ceil(pathPosition));
+            const pathFraction = pathPosition === undefined ? 0 : pathPosition - pathFloor;
+            const fromCell = p.path[pathFloor] ?? cell;
+            const toCell = p.path[pathCeil] ?? fromCell;
+            const fromRow = Math.floor(fromCell / COLS);
+            const fromCol = fromCell % COLS;
+            const toRow = Math.floor(toCell / COLS);
+            const toCol = toCell % COLS;
+            const visualRow = fromRow + (toRow - fromRow) * pathFraction;
+            const visualCol = fromCol + (toCol - fromCol) * pathFraction;
+            const orbLeft = `${((visualCol + 0.5) / COLS) * 100}%`;
+            const orbTop = `${((visualRow + 0.5) / ROWS) * 100}%`;
             return (
               <div key={`orb-${unit.id}`} className="frozenOrbLayer">
+                {unit.tier >= 3 && (unit.frozenOrbTrailCells ?? []).map((trail, trailIndex) => (
+                  <span
+                    key={`${trail.cell}-${trailIndex}`}
+                    className="frozenOrbTrail"
+                    style={{
+                      left: `${(((trail.cell % COLS) + 0.5) / COLS) * 100}%`,
+                      top: `${((Math.floor(trail.cell / COLS) + 0.5) / ROWS) * 100}%`,
+                      width: `${(1.3 / COLS) * 100}%`,
+                    }}
+                  />
+                ))}
                 <span
                   className="frozenOrbRange"
                   style={{
@@ -777,6 +1046,38 @@ export default function GameBoard(p: Props) {
             );
           })}
 
+        {p.monsters.map((monster) => {
+          const position = getMonsterBoardPosition(monster);
+          const showWarning = monster.heavenlyWarningUntilMs !== undefined && now < monster.heavenlyWarningUntilMs;
+          const showLightning =
+            monster.tier3MageEffectKind === "lightning" &&
+            monster.tier3MageEffectUntilMs !== undefined &&
+            now < monster.tier3MageEffectUntilMs;
+          if (!showWarning && !showLightning) return null;
+          return (
+            <span key={`heavenly-overlay-${monster.id}`} className="heavenlyOverlayLayer" aria-hidden="true">
+              {showWarning && (
+                <i
+                  className="heavenlyWarningCell"
+                  style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                />
+              )}
+              {showLightning && (
+                <b
+                  className="tier3MageVfx tier3LightningVfx"
+                  style={{
+                    left: `${position.x}%`,
+                    top: `${position.y}%`,
+                    backgroundImage: `url(${TIER3_MAGE_VFX.lightning})`,
+                    animationDuration: `${620 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                />
+              )}
+            </span>
+          );
+        })}
+
         {p.monsters.map((m) => {
           const monsterRoute = m.route ?? p.path;
           const a = monsterRoute[Math.min(m.pathStep, monsterRoute.length - 1)] ?? p.start;
@@ -854,6 +1155,12 @@ export default function GameBoard(p: Props) {
           const isMagicMarked = m.magicMarkUntilMs !== undefined && now < m.magicMarkUntilMs;
           const isChainHit = m.chainHitUntilMs !== undefined && now < m.chainHitUntilMs;
           const isSwordsmanComboHit = m.swordsmanComboHitUntilMs !== undefined && now < m.swordsmanComboHitUntilMs;
+          const tier3WarriorEffect =
+            m.tier3EffectUntilMs !== undefined &&
+            now < m.tier3EffectUntilMs &&
+            m.tier3EffectKind !== undefined
+              ? m.tier3EffectKind
+              : undefined;
 
           const displayedMaxHp = m.bossStage === 15 && stage15State !== "phoenix"
             ? m.stage15EggMaxHp ?? m.maxHp
@@ -1012,6 +1319,27 @@ export default function GameBoard(p: Props) {
               )}
               {isBleeding && <span className={`monsterSkillStatus bleed ${isMagicMarked ? "paired" : ""}`} style={{ backgroundImage: `url(${BLEED_EFFECT_IMAGE})` }} aria-label="출혈" />}
               {isMagicMarked && <span className={`monsterSkillStatus magicMark ${isBleeding ? "paired" : ""}`} style={{ backgroundImage: `url(${MAGIC_MARK_EFFECT_IMAGE})` }} aria-label="마력각인" />}
+              {tier3WarriorEffect && tier3WarriorEffect !== "swordsman" && (
+                <span
+                  className={`monsterTier3WarriorEffect effect-${tier3WarriorEffect}`}
+                  style={{
+                    backgroundImage: `url(${TIER3_WARRIOR_VFX[tier3WarriorEffect]})`,
+                    animationDuration: `${650 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
+              {tier3WarriorEffect === "swordsman" && (
+                <span
+                  className="monsterTier3SwordsmanHit"
+                  style={{
+                    animationDuration: `${520 / p.animationSpeed}ms`,
+                    animationPlayState: p.animationPaused ? "paused" : "running",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
               {isSwordsmanComboHit && <span className="monsterSwordsmanComboHit" style={{ backgroundImage: `url(${ACTIVE_SKILL_VFX.swordsman})` }} aria-hidden="true" />}
               {isChainHit && <span className="monsterChainHit" style={{ backgroundImage: `url(${CHAIN_LIGHTNING_EFFECT_IMAGE})` }} aria-hidden="true" />}
               <span

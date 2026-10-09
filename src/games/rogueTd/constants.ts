@@ -199,24 +199,40 @@ export const ICE_SLOW_CHANCE = 0.10;
 export const LIGHTNING_PARALYZE_CHANCE = 0.15;
 export const SNIPER_EXECUTE_CHANCE = 0.05;
 export const SWORDSMAN_COMBO_COOLDOWN_MS = 8000;
-export const SWORDSMAN_COMBO_DAMAGE_RATIO = 2.2;
+export const SWORDSMAN_COMBO_DAMAGE_RATIO = 4.4;
 export const DUAL_BLEED_CHANCE = 0.2;
 export const DUAL_BLEED_DURATION_MS = 3000;
 export const DUAL_BLEED_TICK_MS = 1000;
-export const DUAL_BLEED_MAX_TICK_DAMAGE = 30;
+export const DUAL_BLEED_MAX_TICK_DAMAGE = 60;
 export const MAGIC_MARK_CHANCE = 0.15;
 export const MAGIC_MARK_DURATION_MS = 6000;
 export const FIRE_SPLASH_RATIO = 0.2;
 export const FROZEN_ORB_COOLDOWN_MS = 12000;
 export const FROZEN_ORB_DURATION_MS = 6000;
-export const FROZEN_ORB_TICK_MS = 1500;
+export const FROZEN_ORB_TICK_MS = 500;
 export const CHAIN_LIGHTNING_COOLDOWN_MS = 9000;
 export const RIFLE_ADRENALINE_READY_MS = 10000;
 export const RIFLE_ADRENALINE_BOOST_MS = 4000;
 export const RIFLE_ADRENALINE_FATIGUE_MS = 2000;
 export const RIFLE_ADRENALINE_CYCLE_MS = 16000;
+export const TIER3_RIFLE_CRIT_CHANCE = 0.2;
+export const TIER3_RIFLE_CRIT_DAMAGE_RATIO = 2;
 export const SHOTGUN_BARRAGE_COOLDOWN_MS = 8000;
 export const SHOTGUN_BARRAGE_RADIUS_TILES = 1.8;
+export const TIER3_SWORDSMAN_COMBO_COOLDOWN_MS = 7000;
+export const TIER3_SWORDSMAN_COMBO_DAMAGE_RATIO = 5.2;
+export const TIER3_DUAL_BLEED_CHANCE = 0.25;
+export const TIER3_DUAL_BLEED_DURATION_MS = 4000;
+export const DUAL_BLOOD_FLURRY_COOLDOWN_MS = 10000;
+export const MAGIC_MARK_FIELD_COOLDOWN_MS = 11000;
+export const FIRE_PILLAR_COOLDOWN_MS = 10000;
+export const SNIPER_KILL_SHOT_COOLDOWN_MS = 12000;
+export const TIER3_SNIPER_HAWK_EYE_DAMAGE_RATIO = 1.35;
+export const TIER3_SNIPER_KILL_SHOT_DAMAGE_RATIO = 3.5;
+export const TIER3_FROZEN_ORB_RADIUS_TILES = 1.8;
+export const TIER3_FROZEN_ORB_MOVE_TILES_PER_SEC = 0.5;
+export const TIER3_CHAIN_MAX_TARGETS = 8;
+export const TIER3_SHOTGUN_BARRAGE_RADIUS_TILES = 2;
 
 // 신규 룰 관련 상수
 export const MAX_MONSTER_LAPS = 5; // 5회 완주 시 즉시 게임 오버
@@ -241,6 +257,8 @@ export const getBossClearGold = (wave: number) =>
     : BOSS_CLEAR_GOLD + (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1) * 20;
 export const WAVE_TIMEOUT_GOLD = 10;
 export const UPGRADE_DAMAGE_PER_LEVEL = 0.05; // +1업당 기본 피해량 5%
+export const getUnitUpgradeDamageMultiplier = (typeId: UnitTypeId, upgradeLevels: number) =>
+  upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL * (typeId === "dual_swordsman" ? 2 : 1);
 
 // 타입 상성 배율표
 export const DAMAGE_MULTIPLIERS: Record<
@@ -357,7 +375,7 @@ export const UNIT_TYPES: Record<UnitTypeId, UnitTypeDef> = {
     unitClass: "ranger",
     specType: "balance",
     cost: SHOP_DRAW_COST,
-    damage: 13,
+    damage: 15,
     rangeTiles: 2.8,
     attackIntervalMs: 650,
     description: "밸런스형 원거리 사수 (긴 사거리, 안정적 단일 피해)",
@@ -383,7 +401,7 @@ export const UNIT_TYPES: Record<UnitTypeId, UnitTypeDef> = {
     unitClass: "ranger",
     specType: "air_spec",
     cost: SHOP_DRAW_COST,
-    damage: 30,
+    damage: 32,
     rangeTiles: 3.8,
     attackIntervalMs: 1800,
     description: "조류 특화 초장거리 사수 (매우 강한 피해, 5% 확률 일반적 즉사)",

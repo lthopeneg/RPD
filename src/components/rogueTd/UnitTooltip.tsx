@@ -1,8 +1,8 @@
 import {
   UNIT_TYPES,
-  UPGRADE_DAMAGE_PER_LEVEL,
   getUnitTierAttackSpeedBonus,
   getUnitTierDamageMultiplier,
+  getUnitUpgradeDamageMultiplier,
   getUnitTierRangeBonus,
 } from "../../games/rogueTd/constants";
 import type { UnitTypeId } from "../../games/rogueTd/types";
@@ -29,7 +29,7 @@ export default function UnitTooltip({
 }: Props) {
   const unit = UNIT_TYPES[typeId];
   const baseDamage = unit.damage * getUnitTierDamageMultiplier(tier, unit.unitClass);
-  const upgradeDamage = unit.damage * upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL;
+  const upgradeDamage = unit.damage * getUnitUpgradeDamageMultiplier(typeId, upgradeLevels);
   const totalDamage = baseDamage + upgradeDamage;
   const attackInterval = unit.unitClass === "warrior"
     ? unit.attackIntervalMs / (1 + warriorAttackSpeedBonus + getUnitTierAttackSpeedBonus(tier, unit.unitClass))

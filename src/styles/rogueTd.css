@@ -59,7 +59,7 @@ body {
   min-height: 0;
   border: 1px solid #444b57;
   background: #171a20;
-  overflow: visible;
+  overflow: hidden;
 }
 .board.stompShaking {
   animation: stage10BoardShake 450ms linear 1;
@@ -2856,7 +2856,7 @@ body {
 
 /* 맵 셀·창고 슬롯 컨텍스트 메뉴 */
 .board {
-  overflow: visible;
+  overflow: hidden;
 }
 
 .cell.menuOpen,
@@ -4360,6 +4360,21 @@ body {
 .debugCheck { flex: 0 0 auto !important; white-space: nowrap; }
 .debugCheck input { width: auto !important; min-height: 0; margin: 0 !important; }
 .debugCount { width: 52px; }
+.debugMonsterQueue {
+  min-height: 30px;
+  margin: 6px 0;
+  padding: 5px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  border: 1px solid rgba(71, 85, 105, .7);
+  border-radius: 4px;
+  background: rgba(2, 6, 23, .5);
+}
+.debugMonsterQueue > span { color: #64748b; font-size: 10px; }
+.debugMonsterQueue > button { color: #dbeafe; background: rgba(30, 41, 59, .86); }
+.debugPanel button:disabled { opacity: .4; cursor: not-allowed; }
 
 .unitTooltip {
   position: absolute;
@@ -4512,6 +4527,7 @@ body {
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.85);
   overflow: hidden;
   pointer-events: none;
+  opacity: 0.68;
 }
 .unitActiveSkill img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
 .unitActiveSkill i {
@@ -4529,7 +4545,7 @@ body {
   line-height: 1;
   text-shadow: 0 1px 2px #000, 0 0 3px #000;
 }
-.unitActiveSkill.ready { border-color: #fde68a; box-shadow: 0 0 8px rgba(250, 204, 21, 0.9); animation: activeSkillReadyPulse 700ms ease-in-out infinite alternate; }
+.unitActiveSkill.ready { opacity: 0.78; border-color: #fde68a; box-shadow: 0 0 8px rgba(250, 204, 21, 0.72); animation: activeSkillReadyPulse 700ms ease-in-out infinite alternate; }
 @keyframes activeSkillReadyPulse { to { transform: translateX(-50%) scale(1.12); filter: brightness(1.25); } }
 
 .tierTwoSkillBurst {
@@ -4560,6 +4576,252 @@ body {
   box-shadow: inset 0 0 14px rgba(251, 146, 60, 0.34), 0 0 9px rgba(249, 115, 22, 0.42);
   animation: shotgunBarrageAreaFlash 520ms ease-out both;
   pointer-events: none;
+}
+.warriorSkillArea {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  box-sizing: border-box;
+  border: 2px solid rgba(239, 68, 68, .68);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(254, 226, 226, .06) 0 40%, rgba(239, 68, 68, .16) 72%, rgba(127, 29, 29, .26) 100%);
+  box-shadow: inset 0 0 16px rgba(239, 68, 68, .36), 0 0 10px rgba(239, 68, 68, .46);
+  pointer-events: none;
+  animation: warriorSkillAreaFlash 650ms ease-out both;
+}
+.warriorSkillArea.magic_swordsman {
+  border-color: rgba(192, 132, 252, .72);
+  background: radial-gradient(circle, rgba(243, 232, 255, .06) 0 40%, rgba(168, 85, 247, .17) 72%, rgba(88, 28, 135, .28) 100%);
+  box-shadow: inset 0 0 16px rgba(192, 132, 252, .38), 0 0 11px rgba(168, 85, 247, .5);
+}
+@keyframes warriorSkillAreaFlash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+  18% { opacity: .9; transform: translate(-50%, -50%) scale(1); }
+  70% { opacity: .72; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.04); }
+}
+.swordsmanGroundWave {
+  position: absolute;
+  inset: 0;
+  z-index: 19;
+  pointer-events: none;
+}
+.swordsmanWaveCell {
+  position: absolute;
+  z-index: 19;
+  border: 1px solid rgba(186, 230, 253, .72);
+  background: rgba(125, 211, 252, .28);
+  box-shadow: inset 0 0 12px rgba(224, 242, 254, .5), 0 0 8px rgba(56, 189, 248, .42);
+  animation: swordsmanWaveCellFlash 620ms ease-out both;
+}
+.swordsmanGroundSlash {
+  position: absolute;
+  display: block;
+  height: 34px;
+  transform-origin: center;
+  z-index: 21;
+  background-size: 400% 100%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  filter: drop-shadow(0 0 4px #e0f2fe) drop-shadow(0 0 9px #38bdf8);
+  animation: swordsmanGroundSlashFrames 620ms linear both;
+}
+.swordsmanGroundSlash.straight { height: 78px; }
+.swordsmanGroundSlash.diagonal { height: 68px; }
+@keyframes swordsmanWaveCellFlash {
+  0% { opacity: 0; }
+  12% { opacity: .9; }
+  68% { opacity: .72; }
+  100% { opacity: 0; }
+}
+@keyframes swordsmanGroundSlashFrames {
+  0%, 24.99% { background-position: 0 0; opacity: .75; }
+  25%, 49.99% { background-position: 33.333% 0; opacity: 1; }
+  50%, 74.99% { background-position: 66.666% 0; opacity: 1; }
+  75%, 92% { background-position: 100% 0; opacity: .82; }
+  100% { background-position: 100% 0; opacity: 0; }
+}
+.monsterTier3SwordsmanHit {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - var(--monster-visual-offset, 0px));
+  width: 72px;
+  height: 72px;
+  transform: translate(-50%, -50%);
+  z-index: 106;
+  pointer-events: none;
+  border-radius: 50%;
+  background:
+    linear-gradient(45deg, transparent 45%, rgba(255, 255, 255, .98) 49%, #7dd3fc 52%, transparent 57%),
+    linear-gradient(-45deg, transparent 45%, rgba(255, 255, 255, .92) 49%, #38bdf8 52%, transparent 57%);
+  filter: drop-shadow(0 0 6px #e0f2fe) drop-shadow(0 0 12px #0ea5e9);
+  animation: monsterTier3SwordsmanHit 520ms ease-out both;
+}
+@keyframes monsterTier3SwordsmanHit {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.25) rotate(-18deg); }
+  22% { opacity: 1; transform: translate(-50%, -50%) scale(1.08) rotate(0deg); }
+  58% { opacity: .82; transform: translate(-50%, -50%) scale(.92) rotate(5deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.35) rotate(9deg); }
+}
+.tier3MageVfx {
+  position: absolute;
+  display: block;
+  transform: translate(-50%, -50%);
+  background-size: 600% 100%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  pointer-events: none;
+  animation-name: tier3MageVfxFrames;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+.tier3FireComposite {
+  position: absolute;
+  inset: 0;
+  z-index: 102;
+  pointer-events: none;
+}
+.tier3FirePillarLayer {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 102;
+  pointer-events: none;
+  opacity: .62;
+}
+.tier3FirePillarDamageTiles {
+  position: absolute;
+  display: block;
+  border: 1px solid rgba(248, 113, 113, .72);
+  background-color: rgba(239, 68, 68, .24);
+  background-image:
+    linear-gradient(to right, transparent calc(33.333% - .5px), rgba(254, 202, 202, .58) calc(33.333% - .5px), rgba(254, 202, 202, .58) calc(33.333% + .5px), transparent calc(33.333% + .5px), transparent calc(66.666% - .5px), rgba(254, 202, 202, .58) calc(66.666% - .5px), rgba(254, 202, 202, .58) calc(66.666% + .5px), transparent calc(66.666% + .5px)),
+    linear-gradient(to bottom, transparent calc(50% - .5px), rgba(254, 202, 202, .58) calc(50% - .5px), rgba(254, 202, 202, .58) calc(50% + .5px), transparent calc(50% + .5px));
+  box-shadow: inset 0 0 12px rgba(254, 202, 202, .25), 0 0 8px rgba(239, 68, 68, .28);
+  animation: fireDamageTilesPulse 900ms ease-in-out infinite alternate;
+}
+@keyframes fireDamageTilesPulse { from { opacity: .56; } to { opacity: .82; } }
+.tier3FirePillarVfx {
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 210%;
+  z-index: 103;
+  transform: translate(-50%, calc(-72% - 16px));
+  filter: drop-shadow(0 0 10px rgba(249, 115, 22, .9));
+  background-size: 300% 100%;
+  animation-name: tier3FirePillarFrames;
+}
+.tier3FirePillarLoopVfx {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 78%;
+  height: 210%;
+  z-index: 104;
+  transform: translate(-50%, calc(-72% - 16px));
+  background-size: 600% 100%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  filter: opacity(.46) drop-shadow(0 0 8px rgba(249, 115, 22, .82));
+  pointer-events: none;
+  animation-name: tier3FirePillarLoopFrames, tier3FirePillarLoopVisibility;
+  animation-duration: var(--fire-loop-cycle, 720ms), var(--fire-total-duration, 3000ms);
+  animation-timing-function: steps(1, end), linear;
+  animation-iteration-count: infinite, 1;
+  animation-fill-mode: none, both;
+}
+@keyframes tier3FirePillarLoopFrames {
+  0%, 16.65% { background-position: 0 0; }
+  16.66%, 33.32% { background-position: 20% 0; }
+  33.33%, 49.99% { background-position: 40% 0; }
+  50%, 66.65% { background-position: 60% 0; }
+  66.66%, 83.32% { background-position: 80% 0; }
+  83.33%, 100% { background-position: 100% 0; }
+}
+@keyframes tier3FirePillarLoopVisibility {
+  0%, 15% { opacity: 0; }
+  18%, 80% { opacity: 1; }
+  84%, 100% { opacity: 0; }
+}
+@keyframes tier3FirePillarFrames {
+  0%, 8.32% { background-position: 0 0; opacity: .68; }
+  8.33%, 16.65% { background-position: 50% 0; opacity: .9; }
+  16.66%, 83.32% { background-position: 100% 0; opacity: 1; }
+  83.33%, 91.65% { background-position: 50% 0; opacity: .88; }
+  91.66%, 99% { background-position: 0 0; opacity: .62; }
+  100% { background-position: 0 0; opacity: 0; }
+}
+.tier3IceExplosionVfx {
+  width: 190px;
+  height: 190px;
+  z-index: 103;
+  filter: drop-shadow(0 0 10px rgba(125, 211, 252, .9));
+}
+.tier3IceExplosionLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 102;
+  pointer-events: none;
+}
+.tier3IceExplosionRange {
+  position: absolute;
+  display: block;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) scaleY(.52);
+  border: 2px solid rgba(186, 230, 253, .86);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(224, 242, 254, .18), rgba(56, 189, 248, .24) 58%, rgba(14, 165, 233, .08) 70%, transparent 72%);
+  box-shadow: inset 0 0 16px rgba(224, 242, 254, .62), 0 0 14px rgba(56, 189, 248, .7);
+  animation: tier3IceExplosionRange 760ms ease-out both;
+}
+@keyframes tier3IceExplosionRange {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.35, .18); }
+  24% { opacity: .9; transform: translate(-50%, -50%) scale(1, .52); }
+  72% { opacity: .7; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.08, .56); }
+}
+.tier3LightningVfx {
+  width: 92px;
+  height: 133px;
+  z-index: 161;
+  transform: translate(-50%, -72%);
+  filter: opacity(.72) drop-shadow(0 0 10px rgba(250, 204, 21, .9));
+}
+.heavenlyOverlayLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 160;
+  pointer-events: none;
+}
+.heavenlyWarningCell {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  transform: translate(-50%, -50%);
+  z-index: 160;
+  border: 1px solid rgba(253, 224, 71, .88);
+  background: rgba(250, 204, 21, .3);
+  box-shadow: inset 0 0 12px rgba(254, 249, 195, .48), 0 0 10px rgba(250, 204, 21, .4);
+  animation: heavenlyWarningCell 360ms ease-out both;
+  pointer-events: none;
+}
+@keyframes heavenlyWarningCell {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.72); }
+  35%, 72% { opacity: .9; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: .45; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes tier3MageVfxFrames {
+  0%, 16.65% { background-position: 0 0; opacity: .9; }
+  16.66%, 33.32% { background-position: 20% 0; opacity: 1; }
+  33.33%, 49.99% { background-position: 40% 0; opacity: 1; }
+  50%, 66.65% { background-position: 60% 0; opacity: 1; }
+  66.66%, 83.32% { background-position: 80% 0; opacity: .92; }
+  83.33%, 96% { background-position: 100% 0; opacity: .72; }
+  100% { background-position: 100% 0; opacity: 0; }
 }
 .shotgunBarrageArea > i {
   position: absolute;
@@ -4664,6 +4926,18 @@ body {
   animation: frozenOrbRangePulse 1500ms ease-in-out infinite alternate;
   pointer-events: none;
 }
+.frozenOrbTrail {
+  position: absolute;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) scaleY(0.48);
+  z-index: 7;
+  border: 1px solid rgba(186, 230, 253, 0.5);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(224, 242, 254, 0.34), rgba(56, 189, 248, 0.18) 62%, transparent 74%);
+  box-shadow: 0 0 7px rgba(125, 211, 252, 0.45);
+  opacity: 0.72;
+  pointer-events: none;
+}
 
 @keyframes frozenOrbRangePulse {
   from { opacity: 0.58; filter: brightness(0.92); }
@@ -4704,13 +4978,21 @@ body {
 }
 .unitTierSkill {
   margin-top: 7px;
-  padding-top: 7px;
-  border-top: 1px solid rgba(96, 165, 250, 0.28);
+  padding-top: 0;
+}
+.unitTierSkill > strong {
+  display: block;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.28);
+  color: #7dd3fc;
+  font-size: 11px;
+}
+.unitSkillIconRow {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+  padding-top: 7px;
 }
-.unitTierSkill > strong { color: #7dd3fc; font-size: 11px; }
 .unitSkillIcon {
   position: relative;
   width: 58px;
@@ -4725,8 +5007,9 @@ body {
 .unitSkillIcon img { width: 100%; height: 100%; display: block; object-fit: contain; image-rendering: pixelated; }
 .unitSkillTooltip {
   position: absolute;
-  left: calc(100% + 8px);
-  top: -8px;
+  left: 0;
+  top: auto;
+  bottom: calc(100% + 8px);
   width: 230px;
   transform: none;
   z-index: 90;
@@ -4740,6 +5023,10 @@ body {
   visibility: hidden;
   pointer-events: none;
 }
+.unitSkillIcon:last-child .unitSkillTooltip {
+  right: 0;
+  left: auto;
+}
 .unitSkillTooltip b, .unitSkillTooltip em { display: block; }
 .unitSkillTooltip b { margin-bottom: 5px; color: #f8fafc; font-size: 12px; }
 .unitSkillTooltip em { color: #cbd5e1; font-size: 11px; line-height: 1.45; font-style: normal; }
@@ -4751,6 +5038,126 @@ body {
 .monsterSkillStatus.magicMark.paired { top: -39px; }
 .monsterSkillStatus.bleed.paired { left: 30%; }
 .monsterSkillStatus.magicMark.paired { left: 70%; }
+.monsterTier3WarriorEffect {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 112px;
+  height: 112px;
+  transform: translate(-50%, -50%);
+  z-index: 104;
+  background-size: 600% 100%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  filter: drop-shadow(0 0 7px currentColor);
+  pointer-events: none;
+  animation: tier3WarriorEffectFrames 650ms linear both;
+}
+.monsterTier3WarriorEffect.effect-swordsman { width: 132px; height: 96px; color: #38bdf8; }
+.monsterTier3WarriorEffect.effect-dual_swordsman { color: #ef4444; }
+.monsterTier3WarriorEffect.effect-magic_swordsman {
+  top: calc(50% - var(--monster-visual-offset, 0px));
+  width: 124px;
+  height: 124px;
+  color: #c084fc;
+}
+@keyframes tier3WarriorEffectFrames {
+  0%, 16.65% { background-position: 0 0; opacity: 1; }
+  16.66%, 33.32% { background-position: 20% 0; }
+  33.33%, 49.99% { background-position: 40% 0; }
+  50%, 66.65% { background-position: 60% 0; }
+  66.66%, 83.32% { background-position: 80% 0; }
+  83.33%, 100% { background-position: 100% 0; opacity: .12; }
+}
+.tier3RangerUnitEffect {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 118px;
+  height: 118px;
+  transform: translate(-50%, -50%);
+  z-index: 180;
+  background-size: 600% 100%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  pointer-events: none;
+  animation-name: tier3RangerEffectFrames;
+  animation-timing-function: steps(1, end);
+  animation-fill-mode: both;
+}
+.tier3ShotgunEffectAnchor {
+  position: absolute;
+  width: 0;
+  height: 0;
+  margin-top: 10px;
+  z-index: 180;
+  pointer-events: none;
+}
+.tier3ShotgunRangeFan,
+.tier3ShotgunBlast {
+  position: absolute;
+  top: -108px;
+  height: 216px;
+  transform-origin: center;
+  pointer-events: none;
+}
+.tier3ShotgunRangeFan,
+.tier3ShotgunBlast {
+  right: -31px;
+}
+.tier3ShotgunRangeFan {
+  width: 216px;
+  z-index: 0;
+  overflow: visible;
+  animation: tier3ShotgunRangePreview 520ms ease-out both;
+}
+.tier3ShotgunRangeFan path {
+  fill: rgba(239, 68, 68, .08);
+  stroke: rgba(248, 113, 113, .46);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.tier3ShotgunBlast {
+  top: -90px;
+  right: -29px;
+  width: 180px;
+  height: 180px;
+  z-index: 1;
+  display: block;
+  background-size: 600% 100%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  image-rendering: auto;
+  filter: opacity(.56) drop-shadow(0 0 6px rgba(249, 115, 22, .6));
+  animation-name: tier3RangerEffectFrames;
+  animation-timing-function: steps(1, end);
+  animation-fill-mode: both;
+}
+@keyframes tier3ShotgunRangePreview {
+  0% { opacity: 0; }
+  12%, 52% { opacity: 1; }
+  68%, 100% { opacity: 0; }
+}
+.tier3RangerUnitEffect.rifleman {
+  width: 128px;
+  height: 128px;
+  filter: opacity(.62) drop-shadow(0 0 7px rgba(190, 242, 100, .9));
+}
+.tier3RangerUnitEffect.sniper {
+  width: 164px;
+  height: 164px;
+  filter: opacity(.38) drop-shadow(0 0 6px rgba(239, 68, 68, .72));
+}
+@keyframes tier3RangerEffectFrames {
+  0%, 16.65% { background-position: 0 0; opacity: .9; }
+  16.66%, 33.32% { background-position: 20% 0; opacity: 1; }
+  33.33%, 49.99% { background-position: 40% 0; opacity: 1; }
+  50%, 66.65% { background-position: 60% 0; opacity: 1; }
+  66.66%, 83.32% { background-position: 80% 0; opacity: .94; }
+  83.33%, 100% { background-position: 100% 0; opacity: 0; }
+}
 .monsterSwordsmanComboHit {
   position: absolute;
   left: 50%;

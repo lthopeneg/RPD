@@ -1,12 +1,17 @@
 import { useState } from "react";
 import { MAX_PLAYER_LEVEL, UNIT_TYPES } from "../../games/rogueTd/constants";
-import type { UnitClass, UnitTypeId } from "../../games/rogueTd/types";
+import type { MonsterCategory, UnitClass, UnitTypeId } from "../../games/rogueTd/types";
 
 export type DebugBrush = "start" | "goal" | "empty" | "natural" | "player" | "permanent";
 export type DebugStagePreset =
   | "normal-human" | "normal-land" | "normal-flying" | "normal-mixed"
   | "boss-5" | "boss-10" | "boss-15" | "boss-20" | "boss-25" | "boss-30"
   | "final-1" | "final-2" | "final-3" | "final-4" | "final-auto";
+
+export interface DebugMonsterEntry {
+  category: MonsterCategory;
+  count: number;
+}
 
 interface Props {
   brush: DebugBrush | null;
@@ -17,6 +22,7 @@ interface Props {
   onAddUnit: (typeId: UnitTypeId, tier: 1 | 2 | 3) => void;
   onApplyStage: (preset: DebugStagePreset) => void;
   onSpawnStage: (count: number) => void;
+  onStartCustomWave: (entries: DebugMonsterEntry[], hp: number) => void;
   onClearMonsters: () => void;
   onSetTimer: (seconds: number) => void;
   onPreviewUltimate: (unitClass: UnitClass) => void;
@@ -37,8 +43,11 @@ export default function DebugPanel(props: Props) {
   const [level, setLevel] = useState(1);
   const [unitType, setUnitType] = useState<UnitTypeId>("swordsman");
   const [unitTier, setUnitTier] = useState<1 | 2 | 3>(1);
-  const [stagePreset, setStagePreset] = useState<DebugStagePreset>("normal-human");
+  const [stagePreset, setStagePreset] = useState<DebugStagePreset>("boss-5");
+  const [monsterCategory, setMonsterCategory] = useState<MonsterCategory>("human");
   const [monsterCount, setMonsterCount] = useState(1);
+  const [monsterHp, setMonsterHp] = useState(100);
+  const [monsterEntries, setMonsterEntries] = useState<DebugMonsterEntry[]>([]);
   const [timer, setTimer] = useState(40);
   const [ultimateClass, setUltimateClass] = useState<UnitClass>("warrior");
 
@@ -80,14 +89,49 @@ export default function DebugPanel(props: Props) {
       </section>
 
       <section>
+        <span className="debugHint">일반 몬스터 웨이브 구성</span>
+        <div className="debugInline">
+          <select aria-label="추가할 몬스터 유형" value={monsterCategory} onChange={(e) => setMonsterCategory(e.target.value as MonsterCategory)}>
+            <option value="human">인간형</option>
+            <option value="land">육지형</option>
+            <option value="flying">비행형</option>
+          </select>
+          <input className="debugCount" aria-label="추가할 마릿수" type="number" min="1" max="100" value={monsterCount} onChange={(e) => setMonsterCount(Number(e.target.value))} />
+          <button
+            type="button"
+            onClick={() => {
+              const count = Math.min(100, Math.max(1, Math.floor(monsterCount || 1)));
+              setMonsterEntries((entries) => {
+                const existing = entries.find((entry) => entry.category === monsterCategory);
+                if (!existing) return [...entries, { category: monsterCategory, count }];
+                return entries.map((entry) => entry.category === monsterCategory
+                  ? { ...entry, count: Math.min(100, entry.count + count) }
+                  : entry);
+              });
+            }}
+          >추가</button>
+        </div>
+        <div className="debugMonsterQueue">
+          {monsterEntries.length === 0
+            ? <span>추가된 몬스터 없음</span>
+            : monsterEntries.map((entry) => (
+                <button key={entry.category} type="button" title="클릭하면 목록에서 제거"
+                  onClick={() => setMonsterEntries((entries) => entries.filter((item) => item.category !== entry.category))}>
+                  {entry.category === "human" ? "인간형" : entry.category === "land" ? "육지형" : "비행형"} × {entry.count}
+                </button>
+              ))}
+        </div>
+        <div className="debugInline">
+          <label>체력 <input type="number" min="1" max="99999999" value={monsterHp} onChange={(e) => setMonsterHp(Number(e.target.value))} /></label>
+          <button type="button" disabled={monsterEntries.length === 0}
+            onClick={() => props.onStartCustomWave(monsterEntries, monsterHp)}>시작</button>
+        </div>
+      </section>
+
+      <section>
+        <span className="debugHint">보스 스테이지</span>
         <div className="debugInline">
           <select value={stagePreset} onChange={(e) => setStagePreset(e.target.value as DebugStagePreset)}>
-            <optgroup label="일반 스테이지">
-              <option value="normal-human">STAGE 1 · 인간형</option>
-              <option value="normal-land">STAGE 2 · 마수형</option>
-              <option value="normal-flying">STAGE 3 · 비행형</option>
-              <option value="normal-mixed">STAGE 4 · 균등 혼합</option>
-            </optgroup>
             <optgroup label="보스 스테이지">
               <option value="boss-5">BOSS STAGE 5 · 인간형</option>
               <option value="boss-10">BOSS STAGE 10 · 마수형</option>
@@ -106,15 +150,11 @@ export default function DebugPanel(props: Props) {
           </select>
           <button type="button" onClick={() => props.onApplyStage(stagePreset)}>스테이지 적용</button>
         </div>
-        <div className="debugInline">
-          <span className="debugHint">소환 수</span>
-          <input className="debugCount" type="number" min="1" max="100" value={monsterCount} onChange={(e) => setMonsterCount(Number(e.target.value))} />
-        </div>
         <button
           type="button"
           className="debugWide"
-          onClick={() => props.onSpawnStage(monsterCount)}
-        >적용된 스테이지 몬스터 소환</button>
+          onClick={() => props.onSpawnStage(1)}
+        >적용된 보스 소환</button>
         <button type="button" className="debugWide" onClick={props.onClearMonsters}>소환 몬스터 초기화</button>
       </section>
 

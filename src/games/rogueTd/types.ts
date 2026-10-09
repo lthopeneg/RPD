@@ -69,11 +69,30 @@ export interface Unit {
   protected?: boolean;
   activeSkillCooldownMs?: number;
   skillEffectUntilMs?: number;
+  tier3AreaKind?: "dual_swordsman" | "magic_swordsman";
+  tier3RangerEffectUntilMs?: number;
+  tier3RangerEffectKind?: "rifleman" | "shotgunner" | "sniper";
+  tier3RangerEffectRow?: number;
+  tier3RangerEffectCol?: number;
+  tier3RangerEffectAngleDeg?: number;
+  swordsmanWaveUntilMs?: number;
+  swordsmanWaveOriginRow?: number;
+  swordsmanWaveOriginCol?: number;
+  swordsmanWaveDirectionRow?: number;
+  swordsmanWaveDirectionCol?: number;
+  swordsmanWaveLength?: number;
   adrenalinePhase?: "boost" | "fatigue";
   adrenalinePhaseUntilMs?: number;
   frozenOrbCell?: number;
+  frozenOrbPathPosition?: number;
+  frozenOrbTrailCells?: Array<{ cell: number; untilMs: number }>;
   frozenOrbUntilMs?: number;
   frozenOrbNextTickMs?: number;
+  frozenOrbExplosionCell?: number;
+  frozenOrbExplosionUntilMs?: number;
+  heavenlyJudgmentNextAtMs?: number;
+  swordsmanAttackCount?: number;
+  shotgunAttackCount?: number;
 }
 
 export interface Monster {
@@ -108,8 +127,18 @@ export interface Monster {
   bleedNextTickMs?: number;
   bleedSourceUnitId?: number;
   magicMarkUntilMs?: number;
+  magicMarkTier?: number;
   chainHitUntilMs?: number;
   swordsmanComboHitUntilMs?: number;
+  tier3EffectUntilMs?: number;
+  tier3EffectKind?: "swordsman" | "dual_swordsman" | "magic_swordsman";
+  tier3MageEffectUntilMs?: number;
+  tier3MageEffectKind?: "lightning";
+  heavenlyWarningUntilMs?: number;
+  firePillarUntilMs?: number;
+  firePillarNextTickMs?: number;
+  firePillarTickDamage?: number;
+  firePillarSourceUnitId?: number;
   summonedByBossId?: number;
   noKillGold?: boolean;
   stage05BeingAbsorbed?: boolean;
@@ -164,4 +193,6 @@ export interface Projectile {
   effectType?: "normal" | "magic_swordsman" | "fire" | "ice" | "lightning" | "sniper" | "shotgun";
   appliesBleed?: boolean;
   skillAttack?: boolean;
+  swordsmanWave?: boolean;
+  shotgunDoubleBarrel?: boolean;
 }
