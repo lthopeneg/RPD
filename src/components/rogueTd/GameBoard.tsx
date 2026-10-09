@@ -1181,6 +1181,16 @@ export default function GameBoard(p: Props) {
                 ? "bossStage15EggSprite"
                 : monsterSpriteClass
             : monsterSpriteClass;
+          const monsterLeft = m.isFinalBoss
+            ? `clamp(82px, ${x}%, calc(100% - 82px))`
+            : m.isBoss
+              ? `clamp(44px, ${x}%, calc(100% - 44px))`
+              : `${x}%`;
+          const monsterTop = m.isFinalBoss
+            ? `clamp(92px, ${y}%, calc(100% - 66px))`
+            : m.isBoss
+              ? `clamp(64px, ${y}%, calc(100% - 44px))`
+              : `${y}%`;
 
           return (
             <span
@@ -1189,8 +1199,8 @@ export default function GameBoard(p: Props) {
                 isParalyzed ? "paralyzed" : isSlow ? "slowed" : ""
               }`}
               style={{
-                left: `${x}%`,
-                top: `${y}%`,
+                left: monsterLeft,
+                top: monsterTop,
                 ...(m.stage05BeingAbsorbed
                   ? {
                       animationDuration: `${STAGE05_ABSORB_CAST_MS / p.animationSpeed}ms`,

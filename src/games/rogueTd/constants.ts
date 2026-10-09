@@ -117,11 +117,12 @@ export const getBossCategory = (wave: number): MonsterCategory => {
   if (isFinalStage(wave)) return "human";
   return MONSTER_ROTATION[(Math.floor(wave / BOSS_WAVE_INTERVAL) - 1) % MONSTER_ROTATION.length];
 };
+export const ENEMY_HP_MULTIPLIER = 1.1;
 export const FINAL_BOSS_PHASE_HP = 20000;
 export const getBossHp = (wave: number) => {
-  if (isFinalStage(wave)) return FINAL_BOSS_PHASE_HP * 4;
+  if (isFinalStage(wave)) return Math.round(FINAL_BOSS_PHASE_HP * 4 * ENEMY_HP_MULTIPLIER);
   const baseHp = BOSS_HP * 3 * 1.75 ** (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1);
-  return Math.round(baseHp * (wave === 20 ? 0.75 : 1));
+  return Math.round(baseHp * (wave === 20 ? 0.75 : 1) * ENEMY_HP_MULTIPLIER);
 };
 // 1차 밸런스: 인간은 기준형, 육지는 느리고 튼튼하며 조류는 빠르고 약하다.
 export const MONSTER_STATS: Record<MonsterCategory, { hp: number; speed: number }> = {
@@ -134,6 +135,7 @@ export const getMonsterHp = (category: MonsterCategory, wave: number) =>
   Math.round(
     MONSTER_STATS[category].hp *
     2.25 *
+    ENEMY_HP_MULTIPLIER *
     (1 + Math.max(0, wave - 1) * MONSTER_HP_GROWTH_PER_WAVE) *
     (wave === 31
       ? 1.35
@@ -175,7 +177,7 @@ export const STAGE20_SHIELD_RATIO = 0.7;
 export const STAGE20_SHIELD_SEGMENTS = 4;
 export const STAGE20_SHIELD_DAMAGE_REDUCTION = 0.5;
 export const STAGE20_SHIELDED_SPEED_RATIO = 0.2;
-export const STAGE20_BREAK_STUN_MS = 8000;
+export const STAGE20_BREAK_STUN_MS = 5000;
 export const STAGE20_BREAK_COOLDOWN_MS = 15000;
 export const STAGE20_BREAK_DAMAGE_MULTIPLIER = 2;
 export const STAGE25_SPEED_RATIO = 0.5;

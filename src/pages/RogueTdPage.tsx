@@ -895,7 +895,6 @@ export default function RogueTdPage() {
     };
     waveTimeRemainingMs.current = timeLimit * 1000;
     setWaveTimeRemainingSec(timeLimit);
-    if (isBossWave(stage)) triggerBossWarning(stage);
     setStatus(`🛠 디버그: ${stage === 36 ? "FINAL STAGE" : `${stage}스테이지`} 설정을 적용했습니다.`);
   };
 
@@ -2299,7 +2298,7 @@ export default function RogueTdPage() {
             m.stage20ShieldBreakUntilMs = gameNow + 700;
             m.slowUntilMs = undefined;
             m.paralyzeUntilMs = undefined;
-            setStatus("💥 보호막 파괴! 성채기사가 8초간 기절하고 받는 피해가 두 배가 됩니다!");
+            setStatus("💥 보호막 파괴! 성채기사가 5초간 기절하고 받는 피해가 두 배가 됩니다!");
             addLog("20스테이지 보스의 보호막을 파괴했습니다. 약점 노출 시간이 시작됩니다.");
           }
           return actualShieldDamage;
