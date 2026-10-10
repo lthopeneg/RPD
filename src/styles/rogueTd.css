@@ -2858,6 +2858,43 @@ body {
   gap: 2px;
 }
 
+.rightRail .damageRow.empty {
+  min-height: 32px;
+  border: 1px dashed rgba(71, 85, 105, 0.45);
+  background: rgba(15, 20, 28, 0.45);
+}
+
+.damagePagination {
+  display: grid;
+  grid-template-columns: 30px 1fr 30px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+.damagePagination button {
+  height: 24px;
+  padding: 0;
+  border: 1px solid #475569;
+  border-radius: 5px;
+  background: #202631;
+  color: #dbeafe;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.damagePagination button:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.damagePagination span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
 .info {
   margin: 0;
 }
@@ -4507,12 +4544,12 @@ body {
     transform: none;
   }
   .rightRail .damageReport {
-    flex: 1 1 auto;
-    min-height: 180px;
+    flex: 0 0 auto;
+    min-height: 0;
     max-height: none;
     overflow: hidden;
   }
-  .rightRail .playerResourcePanel { margin-top: 0; }
+  .rightRail .playerResourcePanel { margin-top: auto; }
   .leftRail .synergyList { gap: 3px; }
   .leftRail .synergyItem { padding: 2px 5px; }
   .leftRail .synergyItemTitle { font-size: 13px; }

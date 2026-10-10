@@ -237,7 +237,7 @@ export const TIER3_CHAIN_MAX_TARGETS = 8;
 export const TIER3_SHOTGUN_BARRAGE_RADIUS_TILES = 2;
 
 // 신규 룰 관련 상수
-export const MAX_MONSTER_LAPS = 5; // 5회 완주 시 즉시 게임 오버
+export const MAX_MONSTER_LAPS = 5; // 일반 몬스터는 5회 완주 시 제거되고 Life 1 차감
 export const WAVE_TIME_LIMIT_SEC = 90;
 export const BOSS_WAVE_TIME_LIMIT_SEC = 90;
 export const FINAL_WAVE_TIME_LIMIT_SEC = 360;

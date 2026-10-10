@@ -15,13 +15,13 @@ interface Props {
 }
 
 export default function DamageReport({ wave, entries }: Props) {
-  const [showLower, setShowLower] = useState(false);
-  useEffect(() => setShowLower(false), [wave, entries]);
+  const [page, setPage] = useState(0);
+  useEffect(() => setPage(0), [wave, entries]);
   if (wave === null) {
     return (
       <section className="damageReport">
         <div className="damageReportHeader">
-          <strong>데미지 랭킹 TOP 5</strong>
+          <strong>데미지 랭킹</strong>
         </div>
         <p className="damageEmpty">웨이브 종료 후 피해량과 점유율이 표시됩니다.</p>
       </section>
@@ -29,20 +29,24 @@ export default function DamageReport({ wave, entries }: Props) {
   }
   const total = entries.reduce((sum, entry) => sum + entry.damage, 0);
   const sorted = [...entries].sort((a, b) => b.damage - a.damage);
-  const visible = showLower ? sorted.slice(-5) : sorted.slice(0, 5);
-  const visibleRankStart = showLower ? Math.max(1, sorted.length - 4) : 1;
+  const pageSize = 6;
+  const pageCount = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visible = sorted.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const slots = Array.from({ length: pageSize }, (_, index) => visible[index] ?? null);
+  const visibleRankStart = currentPage * pageSize + 1;
 
   return (
     <section className="damageReport">
       <div className="damageReportHeader">
-        <strong>{showLower ? "데미지 랭킹 BOTTOM 5" : "데미지 랭킹 TOP 5"}</strong>
+        <strong>데미지 랭킹</strong>
         <span>총 {total.toLocaleString()}</span>
       </div>
-      {sorted.length === 0 ? (
-        <p className="damageEmpty">배치된 유닛이 없었습니다.</p>
-      ) : (
-        <div className="damageRows">
-          {visible.map((entry, index) => {
+      <div className="damageRows">
+          {slots.map((entry, index) => {
+            if (!entry) {
+              return <div className="damageRow empty" key={`empty-${currentPage}-${index}`} aria-hidden="true" />;
+            }
             const def = UNIT_TYPES[entry.typeId];
             const share = total > 0 ? Math.round(entry.damage / total * 100) : 0;
             return (
@@ -52,13 +56,12 @@ export default function DamageReport({ wave, entries }: Props) {
               </div>
             );
           })}
-        </div>
-      )}
-      {sorted.length > 5 && (
-        <button className="damagePageButton" type="button" onClick={() => setShowLower((value) => !value)}>
-          {showLower ? "TOP 5 보기" : "BOTTOM 5 보기"}
-        </button>
-      )}
+      </div>
+      <div className="damagePagination" aria-label="데미지 랭킹 페이지">
+        <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={currentPage === 0} aria-label="이전 순위">‹</button>
+        <span>{currentPage + 1}/{pageCount}</span>
+        <button type="button" onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))} disabled={currentPage >= pageCount - 1} aria-label="다음 순위">›</button>
+      </div>
     </section>
   );
 }

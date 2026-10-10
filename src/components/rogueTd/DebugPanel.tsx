@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MAX_PLAYER_LEVEL, UNIT_TYPES } from "../../games/rogueTd/constants";
+import { MAX_PLAYER_LEVEL, START_LIFE, UNIT_TYPES } from "../../games/rogueTd/constants";
 import type { MonsterCategory, UnitClass, UnitTypeId } from "../../games/rogueTd/types";
 
 export type DebugBrush = "start" | "goal" | "empty" | "natural" | "player" | "permanent";
@@ -19,6 +19,8 @@ interface Props {
   onClearMap: () => void;
   onSetGold: (gold: number) => void;
   onSetPlayerLevel: (level: number) => void;
+  currentLife: number;
+  onRestoreLife: () => void;
   onAddUnit: (typeId: UnitTypeId, tier: 1 | 2 | 3) => void;
   onApplyStage: (preset: DebugStagePreset) => void;
   onSpawnStage: (count: number) => void;
@@ -74,6 +76,11 @@ export default function DebugPanel(props: Props) {
       <section className="debugInline">
         <label>레벨 <input type="number" min="1" max={MAX_PLAYER_LEVEL} value={level} onChange={(e) => setLevel(Number(e.target.value))} /></label>
         <button type="button" onClick={() => props.onSetPlayerLevel(level)}>적용</button>
+      </section>
+
+      <section className="debugInline">
+        <label>라이프 <strong>{props.currentLife}/{START_LIFE}</strong></label>
+        <button type="button" onClick={props.onRestoreLife} disabled={props.currentLife >= START_LIFE}>최대 회복</button>
       </section>
 
       <section className="debugInline">

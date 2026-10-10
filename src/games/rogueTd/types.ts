@@ -114,7 +114,7 @@ export interface Monster {
   pathStep: number;
   progress: number;
   speedTilesPerSecond: number;
-  laps: number; // 일반 몬스터만 5회 도착 시 게임 오버
+  laps: number; // 일반 몬스터는 5회 도착 시 제거되고 Life 1 차감
   route?: number[]; // 지형 변경 직후 현재 위치에서 새 전역 경로로 합류하는 임시 경로
   lastHitTime?: number;
   statusImmunityUntilMs?: number; // 1초 상태이상 공통 면역

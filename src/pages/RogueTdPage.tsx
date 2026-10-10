@@ -2093,7 +2093,7 @@ export default function RogueTdPage() {
       }
 
       // 2. 몬스터 이동 & 완주(laps) 순환 이동 처리
-      let instantGameOver = false;
+      const escapedMonsterIds = new Set<number>();
 
       for (const m of monstersRef.current) {
         if (
@@ -2204,30 +2204,21 @@ export default function RogueTdPage() {
             m.pathStep = 0;
             m.progress = 0;
 
-            // 5회 완주 즉시 게임 오버 규칙!
+            // 일반 몬스터는 5회 완주하면 전장에서 이탈하고 Life를 1 차감한다.
             if (!m.isBoss && m.laps >= MAX_MONSTER_LAPS) {
-              instantGameOver = true;
+              escapedMonsterIds.add(m.id);
+              break;
             }
           }
         }
       }
 
-      if (instantGameOver) {
-        setRunning(false);
-        projectilesRef.current = [];
-    tier3FirePillarsRef.current = [];
-        setProjectiles([]);
-        setGameResult("lost");
-        setDamageReportWave(wave);
-        setWaveDamageReport(waveUnitsRef.current.map((unit) => ({
-          unitId: unit.id,
-          typeId: unit.typeId,
-          tier: unit.tier,
-          damage: waveDamageRef.current[unit.id] ?? 0,
-        })));
-        setStatus("💀 몬스터 5회 완주! 즉시 게임 오버!");
-        addLog("몬스터가 5바퀴를 완주해 게임이 종료되었습니다.");
-        return;
+      if (escapedMonsterIds.size > 0) {
+        const escapedCount = escapedMonsterIds.size;
+        monstersRef.current = monstersRef.current.filter((monster) => !escapedMonsterIds.has(monster.id));
+        setLife((currentLife) => Math.max(0, currentLife - escapedCount));
+        setStatus(`🚨 몬스터 ${escapedCount}마리 탈출! Life -${escapedCount}`);
+        addLog(`5바퀴를 완주한 몬스터 ${escapedCount}마리가 사라져 라이프가 ${escapedCount} 감소했습니다.`);
       }
 
       // 3. 투사체 이동 & 명중 판정 (상성 데미지 + 9종 유닛 스킬 + 1초 상태이상 공통 면역)
@@ -3582,6 +3573,11 @@ export default function RogueTdPage() {
           onClearMap={handleDebugClearMap}
           onSetGold={(value) => setGold(Math.max(0, Math.floor(value || 0)))}
           onSetPlayerLevel={(value) => { setPlayerLevel(Math.min(MAX_PLAYER_LEVEL, Math.max(1, Math.floor(value || 1)))); setPlayerXp(0); }}
+          currentLife={life}
+          onRestoreLife={() => {
+            setLife(START_LIFE);
+            setStatus(`🛠 디버그: 라이프를 ${START_LIFE}까지 회복했습니다.`);
+          }}
           onAddUnit={handleDebugAddUnit}
           onApplyStage={handleDebugApplyStage}
           onSpawnStage={handleDebugSpawnStage}
