@@ -540,6 +540,7 @@ export default function GameBoard(p: Props) {
           );
         })}
 
+        <div className="boardSkillEffectClip" aria-hidden="true">
         {p.units
           .filter((unit) => unit.swordsmanWaveUntilMs !== undefined && now < unit.swordsmanWaveUntilMs)
           .map((unit) => {
@@ -1078,6 +1079,8 @@ export default function GameBoard(p: Props) {
           );
         })}
 
+        </div>
+
         {p.monsters.map((m) => {
           const monsterRoute = m.route ?? p.path;
           const a = monsterRoute[Math.min(m.pathStep, monsterRoute.length - 1)] ?? p.start;
@@ -1181,16 +1184,6 @@ export default function GameBoard(p: Props) {
                 ? "bossStage15EggSprite"
                 : monsterSpriteClass
             : monsterSpriteClass;
-          const monsterLeft = m.isFinalBoss
-            ? `clamp(82px, ${x}%, calc(100% - 82px))`
-            : m.isBoss
-              ? `clamp(44px, ${x}%, calc(100% - 44px))`
-              : `${x}%`;
-          const monsterTop = m.isFinalBoss
-            ? `clamp(92px, ${y}%, calc(100% - 66px))`
-            : m.isBoss
-              ? `clamp(64px, ${y}%, calc(100% - 44px))`
-              : `${y}%`;
 
           return (
             <span
@@ -1199,8 +1192,8 @@ export default function GameBoard(p: Props) {
                 isParalyzed ? "paralyzed" : isSlow ? "slowed" : ""
               }`}
               style={{
-                left: monsterLeft,
-                top: monsterTop,
+                left: `${x}%`,
+                top: `${y}%`,
                 ...(m.stage05BeingAbsorbed
                   ? {
                       animationDuration: `${STAGE05_ABSORB_CAST_MS / p.animationSpeed}ms`,

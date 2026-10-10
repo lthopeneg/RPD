@@ -59,7 +59,15 @@ body {
   min-height: 0;
   border: 1px solid #444b57;
   background: #171a20;
+  overflow: visible;
+}
+.boardSkillEffectClip {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
+  pointer-events: none;
 }
 .board.stompShaking {
   animation: stage10BoardShake 450ms linear 1;
@@ -2856,7 +2864,7 @@ body {
 
 /* 맵 셀·창고 슬롯 컨텍스트 메뉴 */
 .board {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cell.menuOpen,
