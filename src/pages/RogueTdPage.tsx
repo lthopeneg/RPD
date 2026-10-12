@@ -189,6 +189,29 @@ const ULTIMATE_FIRST_ROLL_MS = 20000;
 const ULTIMATE_FAIL_COOLDOWN_MS = 15000;
 const ULTIMATE_SUCCESS_COOLDOWN_MS = 60000;
 const ULTIMATE_TRIGGER_CHANCE = 0.25;
+const FINAL_BOSS_PHASE1_SKILL_COOLDOWN_MS = 5000;
+const FINAL_BOSS_SPACE_SLASH_STUN_MS = 5000;
+const FINAL_BOSS_MANA_BURN_MS = 5000;
+const FINAL_BOSS_SUPPRESSIVE_FIRE_MS = 5000;
+const FINAL_BOSS_PHASE2_FIRST_SHIELD_DELAY_MS = 5000;
+const FINAL_BOSS_PHASE2_SHIELD_DURATION_MS = 10000;
+const FINAL_BOSS_PHASE2_SHIELD_RATIO = 0.2;
+const FINAL_BOSS_PHASE2_SHOTGUN_DELAY_MS = 1000;
+const FINAL_BOSS_PHASE2_SHOTGUN_RADIUS = 1.5;
+const FINAL_BOSS_PHASE2_MARK_INTERVAL_MS = 5000;
+const FINAL_BOSS_PHASE2_MARK_WARNING_MS = 600;
+const FINAL_BOSS_PHASE2_FREEZE_DURATION_MS = 5000;
+const FINAL_BOSS_PHASE3_FIRST_DIVE_DELAY_MS = 5000;
+const FINAL_BOSS_PHASE3_DIVE_COOLDOWN_MS = 8000;
+const FINAL_BOSS_PHASE3_DIVE_WARNING_MS = 500;
+const FINAL_BOSS_PHASE3_DIVE_STUN_MS = 5000;
+const FINAL_BOSS_PHASE3_BARRAGE_STOP_MS = 500;
+const FINAL_BOSS_PHASE3_FEATHER_STEP_MS = 250;
+const FINAL_BOSS_PHASE3_FEATHER_DEBUFF_MS = 5000;
+const FINAL_BOSS_PHASE3_CLEANSE_COOLDOWN_MS = 8000;
+const FINAL_BOSS_PHASE3_CLEANSE_IMMUNITY_MS = 5000;
+const FINAL_BOSS_PHASE3_IMMUNITY_DAMAGE_REDUCTION = 0.5;
+const FINAL_BOSS_PHASE4_COMBO_INTERVAL_MS = 6000;
 const ULTIMATE_DAMAGE_MULTIPLIER: Record<UnitClass, number> = {
   warrior: 3,
   mage: 3,
@@ -211,6 +234,13 @@ const TIER3_ACTIVE_SKILL_COOLDOWN: Partial<Record<UnitTypeId, number>> = {
   magic_swordsman: MAGIC_MARK_FIELD_COOLDOWN_MS,
   fire_mage: FIRE_PILLAR_COOLDOWN_MS,
   sniper: SNIPER_KILL_SHOT_COOLDOWN_MS,
+};
+const ACTIVE_SKILL_FULL_COOLDOWN: Partial<Record<UnitTypeId, number>> = {
+  swordsman: SWORDSMAN_COMBO_COOLDOWN_MS,
+  ice_mage: FROZEN_ORB_COOLDOWN_MS,
+  lightning_mage: CHAIN_LIGHTNING_COOLDOWN_MS,
+  rifleman: RIFLE_ADRENALINE_CYCLE_MS,
+  shotgunner: SHOTGUN_BARRAGE_COOLDOWN_MS,
 };
 interface UltimateContribution {
   unitId: number;
@@ -804,6 +834,16 @@ export default function RogueTdPage() {
       targetId: null,
       lastAttackTimeMs: undefined,
       stunnedUntilMs: undefined,
+      finalBossSlashHitUntilMs: undefined,
+      manaBurnUntilMs: undefined,
+      basicAttackSealUntilMs: undefined,
+      finalBossAttackSlowUntilMs: undefined,
+      finalBossFrostHitUntilMs: undefined,
+      finalBossFreezeStacks: 0,
+      finalBossFreezeStackExpiresAtMs: undefined,
+      finalBossFrozenUntilMs: undefined,
+      finalBossFeatherDebuffUntilMs: undefined,
+      finalBossFeatherHitUntilMs: undefined,
     }));
     unitsRef.current = restedUnits;
     setUnits(restedUnits);
@@ -940,7 +980,7 @@ export default function RogueTdPage() {
         finalBossDebugAutoPhase: isFinalBoss ? requestedFinalAutoPhase : undefined,
         category: spawnCategory,
         hp,
-        maxHp,
+        maxHp: hp,
         pathStep: 0,
         progress: -index * 0.35,
         speedTilesPerSecond: MONSTER_STATS[spawnCategory].speed * (
@@ -963,6 +1003,17 @@ export default function RogueTdPage() {
     const nextMonsters = running ? [...monstersRef.current, ...created] : created;
     monstersRef.current = nextMonsters;
     setMonsters([...nextMonsters]);
+    if (isFinalBoss) {
+      ultimateActiveRef.current = false;
+      ultimateQueueRef.current = [];
+      pendingUltimateHitsRef.current = [];
+      setUltimateSequence(null);
+      ultimateNextRollAtRef.current = {
+        warrior: Number.POSITIVE_INFINITY,
+        mage: Number.POSITIVE_INFINITY,
+        ranger: Number.POSITIVE_INFINITY,
+      };
+    }
     setProjectiles([]);
     projectilesRef.current = [];
     tier3FirePillarsRef.current = [];
@@ -971,8 +1022,34 @@ export default function RogueTdPage() {
     setPaused(false);
     pausedRef.current = false;
     if (!running) {
+      const combatReadyUnits = unitsRef.current.map((unit) => ({
+        ...unit,
+        cooldownMs: 0,
+        targetId: null,
+        lastAttackTimeMs: undefined,
+        stunnedUntilMs: undefined,
+        finalBossSlashHitUntilMs: undefined,
+        manaBurnUntilMs: undefined,
+        basicAttackSealUntilMs: undefined,
+      finalBossAttackSlowUntilMs: undefined,
+      finalBossFrostHitUntilMs: undefined,
+      finalBossFreezeStacks: 0,
+      finalBossFreezeStackExpiresAtMs: undefined,
+      finalBossFrozenUntilMs: undefined,
+      finalBossFeatherDebuffUntilMs: undefined,
+      finalBossFeatherHitUntilMs: undefined,
+        activeSkillCooldownMs: unit.tier >= 2
+          ? ACTIVE_SKILL_INITIAL_COOLDOWN[unit.typeId] === undefined &&
+            !(unit.tier >= 3 && TIER3_ACTIVE_SKILL_COOLDOWN[unit.typeId] !== undefined)
+            ? undefined
+            : 0
+          : undefined,
+        skillEffectUntilMs: undefined,
+      }));
+      unitsRef.current = combatReadyUnits;
+      setUnits(combatReadyUnits);
       waveDamageRef.current = {};
-      waveUnitsRef.current = units.map((unit) => ({ ...unit }));
+      waveUnitsRef.current = combatReadyUnits.map((unit) => ({ ...unit }));
       if (!Number.isFinite(ultimateNextRollAtRef.current.warrior)) {
         ultimateNextRollAtRef.current = {
           warrior: gameTimeMs.current + ULTIMATE_FIRST_ROLL_MS,
@@ -1064,6 +1141,16 @@ export default function RogueTdPage() {
       targetId: null,
       lastAttackTimeMs: undefined,
       stunnedUntilMs: undefined,
+      finalBossSlashHitUntilMs: undefined,
+      manaBurnUntilMs: undefined,
+      basicAttackSealUntilMs: undefined,
+      finalBossAttackSlowUntilMs: undefined,
+      finalBossFrostHitUntilMs: undefined,
+      finalBossFreezeStacks: 0,
+      finalBossFreezeStackExpiresAtMs: undefined,
+      finalBossFrozenUntilMs: undefined,
+      finalBossFeatherDebuffUntilMs: undefined,
+      finalBossFeatherHitUntilMs: undefined,
       activeSkillCooldownMs: unit.tier >= 2
         ? ACTIVE_SKILL_INITIAL_COOLDOWN[unit.typeId] === undefined &&
           !(unit.tier >= 3 && TIER3_ACTIVE_SKILL_COOLDOWN[unit.typeId] !== undefined)
@@ -1410,6 +1497,16 @@ export default function RogueTdPage() {
       targetId: null,
       lastAttackTimeMs: undefined,
       stunnedUntilMs: undefined,
+      finalBossSlashHitUntilMs: undefined,
+      manaBurnUntilMs: undefined,
+      basicAttackSealUntilMs: undefined,
+      finalBossAttackSlowUntilMs: undefined,
+      finalBossFrostHitUntilMs: undefined,
+      finalBossFreezeStacks: 0,
+      finalBossFreezeStackExpiresAtMs: undefined,
+      finalBossFrozenUntilMs: undefined,
+      finalBossFeatherDebuffUntilMs: undefined,
+      finalBossFeatherHitUntilMs: undefined,
       activeSkillCooldownMs: unit.tier >= 2
         ? ACTIVE_SKILL_INITIAL_COOLDOWN[unit.typeId] === undefined &&
           !(unit.tier >= 3 && TIER3_ACTIVE_SKILL_COOLDOWN[unit.typeId] !== undefined)
@@ -1550,7 +1647,10 @@ export default function RogueTdPage() {
       setWaveTimeRemainingSec(Math.ceil(waveTimeRemainingMs.current / 1000));
 
       // 직업별 3성 유닛 3종이 모두 배치되면 보이지 않는 독립 판정을 수행한다.
-      (["warrior", "mage", "ranger"] as UnitClass[]).forEach((unitClass) => {
+      const finalBossBattleActive = isFinalStage(wave) || monstersRef.current.some(
+        (monster) => monster.isFinalBoss && monster.hp > 0,
+      );
+      if (!finalBossBattleActive) (["warrior", "mage", "ranger"] as UnitClass[]).forEach((unitClass) => {
         if (gameNow < ultimateNextRollAtRef.current[unitClass]) return;
         const requiredTypes = ULTIMATE_UNIT_TYPES[unitClass];
         const trio = requiredTypes.map((typeId) =>
@@ -2095,6 +2195,480 @@ export default function RogueTdPage() {
       // 2. 몬스터 이동 & 완주(laps) 순환 이동 처리
       const escapedMonsterIds = new Set<number>();
 
+      const addFinalBossFreezeStack = (unit: Unit) => {
+        const nextStacks = (unit.finalBossFreezeStacks ?? 0) + 1;
+        unit.finalBossFrostHitUntilMs = gameNow + 700;
+        if (nextStacks >= 3) {
+          unit.finalBossFreezeStacks = 0;
+          unit.finalBossFreezeStackExpiresAtMs = undefined;
+          unit.finalBossFrozenUntilMs = gameNow + FINAL_BOSS_PHASE2_FREEZE_DURATION_MS;
+        } else {
+          unit.finalBossFreezeStacks = nextStacks;
+          unit.finalBossFreezeStackExpiresAtMs = gameNow + 5000;
+        }
+      };
+
+      const fireFinalBossPhase2Shotgun = (boss: Monster) => {
+        const bossRoute = boss.route ?? path;
+        const from = bossRoute[Math.min(boss.pathStep, bossRoute.length - 1)] ?? start;
+        const to = bossRoute[Math.min(boss.pathStep + 1, bossRoute.length - 1)] ?? from;
+        const [fromRow, fromCol] = toRC(from);
+        const [toRow, toCol] = toRC(to);
+        const bossRow = fromRow + (toRow - fromRow) * boss.progress;
+        const bossCol = fromCol + (toCol - fromCol) * boss.progress;
+        let affectedCount = 0;
+        for (const unit of unitsRef.current) {
+          const [unitRow, unitCol] = toRC(unit.cell);
+          if (Math.hypot(unitRow - bossRow, unitCol - bossCol) > FINAL_BOSS_PHASE2_SHOTGUN_RADIUS) continue;
+          addFinalBossFreezeStack(unit);
+          affectedCount += 1;
+        }
+        boss.finalBossPhase2ShotgunAtMs = undefined;
+        boss.finalBossPhase2ShotgunEffectUntilMs = gameNow + 650;
+        boss.finalBossPhase2ShieldUsed = false;
+        boss.finalBossPhase2NextShieldAtMs = gameNow + FINAL_BOSS_PHASE2_FIRST_SHIELD_DELAY_MS;
+        setUnits([...unitsRef.current]);
+        setStatus(`❄️ 얼음 산탄! 범위 안 유닛 ${affectedCount}기에 빙결 스택을 부여했습니다.`);
+        addLog(`최종 보스의 얼음 산탄이 유닛 ${affectedCount}기에 적중했습니다.`);
+      };
+
+      const phaseFourBoss = monstersRef.current.find((monster) =>
+        monster.isFinalBoss && monster.hp > 0 && monster.finalBossMode === "combat" && monster.finalBossPhase === 4
+      );
+      if (phaseFourBoss) {
+        if (phaseFourBoss.finalBossPhase4NextComboAtMs === undefined) {
+          phaseFourBoss.finalBossPhase4NextComboAtMs = gameNow + FINAL_BOSS_PHASE4_COMBO_INTERVAL_MS;
+        } else if (gameNow >= phaseFourBoss.finalBossPhase4NextComboAtMs && unitsRef.current.length > 0) {
+          type PhaseFourSkill = "space_slash" | "mana_burn" | "suppressive_fire" | "ice_armor" | "freeze_mark" | "sky_dive" | "radiant_molt";
+          const skillNames: Record<PhaseFourSkill, string> = {
+            space_slash: "공간참",
+            mana_burn: "마력 연소",
+            suppressive_fire: "제압 사격",
+            ice_armor: "빙결 갑주",
+            freeze_mark: "빙결 표식",
+            sky_dive: "급강하",
+            radiant_molt: "광휘의 탈피",
+          };
+          const candidates: PhaseFourSkill[] = [
+            "space_slash", "mana_burn", "suppressive_fire", "freeze_mark", "radiant_molt",
+          ];
+          if ((phaseFourBoss.finalBossPhase2ShieldHp ?? 0) <= 0 && phaseFourBoss.finalBossPhase2ShotgunAtMs === undefined) {
+            candidates.push("ice_armor");
+          }
+          if (phaseFourBoss.finalBossPhase3DiveImpactAtMs === undefined) candidates.push("sky_dive");
+          const selectedSkills = [...candidates].sort(() => Math.random() - 0.5).slice(0, 3);
+          phaseFourBoss.finalBossPhase4NextComboAtMs = gameNow + FINAL_BOSS_PHASE4_COMBO_INTERVAL_MS;
+
+          const bossRoute = phaseFourBoss.route ?? path;
+          const bossFrom = bossRoute[Math.min(phaseFourBoss.pathStep, bossRoute.length - 1)] ?? start;
+          const bossTo = bossRoute[Math.min(phaseFourBoss.pathStep + 1, bossRoute.length - 1)] ?? bossFrom;
+          const [bossFromRow, bossFromCol] = toRC(bossFrom);
+          const [bossToRow, bossToCol] = toRC(bossTo);
+          const bossRow = bossFromRow + (bossToRow - bossFromRow) * phaseFourBoss.progress;
+          const bossCol = bossFromCol + (bossToCol - bossFromCol) * phaseFourBoss.progress;
+          const closestUnit = [...unitsRef.current].sort((a, b) => {
+            const [aRow, aCol] = toRC(a.cell);
+            const [bRow, bCol] = toRC(b.cell);
+            return Math.hypot(aRow - bossRow, aCol - bossCol) - Math.hypot(bRow - bossRow, bCol - bossCol);
+          })[0];
+
+          selectedSkills.forEach((skill) => {
+            if (skill === "space_slash") {
+              const [targetRow, targetCol] = toRC(closestUnit.cell);
+              const rowDirection = Math.abs(targetRow - bossRow) < 0.35 ? 0 : Math.sign(targetRow - bossRow);
+              const colDirection = Math.abs(targetCol - bossCol) < 0.35 ? 0 : Math.sign(targetCol - bossCol);
+              const directionRow = rowDirection === 0 && colDirection === 0 ? 0 : rowDirection;
+              const directionCol = rowDirection === 0 && colDirection === 0 ? 1 : colDirection;
+              const slashLength = directionRow !== 0 && directionCol !== 0 ? 2 : 3;
+              const directionMagnitude = Math.hypot(directionRow, directionCol);
+              unitsRef.current.forEach((unit) => {
+                const [unitRow, unitCol] = toRC(unit.cell);
+                const relativeRow = unitRow - targetRow;
+                const relativeCol = unitCol - targetCol;
+                const forward = (relativeRow * directionRow + relativeCol * directionCol) / directionMagnitude;
+                const side = Math.abs(relativeRow * directionCol - relativeCol * directionRow) / directionMagnitude;
+                if (forward < -0.35 || forward > slashLength - 0.65 || side > 0.62) return;
+                unit.stunnedUntilMs = Math.max(unit.stunnedUntilMs ?? 0, gameNow + FINAL_BOSS_SPACE_SLASH_STUN_MS);
+                unit.finalBossSlashHitUntilMs = gameNow + 700;
+              });
+              phaseFourBoss.finalBossSkillOriginRow = targetRow;
+              phaseFourBoss.finalBossSkillOriginCol = targetCol;
+              phaseFourBoss.finalBossSkillDirectionRow = directionRow;
+              phaseFourBoss.finalBossSkillDirectionCol = directionCol;
+              phaseFourBoss.finalBossSkillLength = slashLength;
+              phaseFourBoss.finalBossPhase4SpaceSlashUntilMs = gameNow + 950;
+            } else if (skill === "mana_burn") {
+              const [targetRow, targetCol] = toRC(closestUnit.cell);
+              const areaRowStart = targetRow - 1;
+              const areaColStart = targetCol - 1;
+              unitsRef.current.forEach((unit) => {
+                const [unitRow, unitCol] = toRC(unit.cell);
+                if (unitRow < areaRowStart || unitRow >= areaRowStart + 2 || unitCol < areaColStart || unitCol >= areaColStart + 3) return;
+                unit.manaBurnUntilMs = Math.max(unit.manaBurnUntilMs ?? 0, gameNow + FINAL_BOSS_MANA_BURN_MS);
+                const fullSkillCooldown = unit.tier >= 3 && unit.typeId === "swordsman"
+                  ? TIER3_SWORDSMAN_COMBO_COOLDOWN_MS
+                  : unit.tier >= 3
+                    ? TIER3_ACTIVE_SKILL_COOLDOWN[unit.typeId] ?? ACTIVE_SKILL_FULL_COOLDOWN[unit.typeId]
+                    : ACTIVE_SKILL_FULL_COOLDOWN[unit.typeId];
+                if (fullSkillCooldown !== undefined) unit.activeSkillCooldownMs = fullSkillCooldown;
+                if (unit.tier >= 3 && unit.typeId === "lightning_mage") unit.heavenlyJudgmentNextAtMs = gameNow + 5000;
+              });
+              phaseFourBoss.finalBossSkillAreaRowStart = areaRowStart;
+              phaseFourBoss.finalBossSkillAreaColStart = areaColStart;
+              phaseFourBoss.finalBossPhase4ManaBurnUntilMs = gameNow + FINAL_BOSS_MANA_BURN_MS;
+            } else if (skill === "suppressive_fire") {
+              [...unitsRef.current]
+                .sort((a, b) => (waveDamageRef.current[b.id] ?? 0) - (waveDamageRef.current[a.id] ?? 0))
+                .slice(0, 3)
+                .forEach((unit) => {
+                  unit.basicAttackSealUntilMs = Math.max(unit.basicAttackSealUntilMs ?? 0, gameNow + FINAL_BOSS_SUPPRESSIVE_FIRE_MS);
+                });
+            } else if (skill === "ice_armor") {
+              const shieldMaxHp = Math.max(1, Math.round(phaseFourBoss.maxHp * FINAL_BOSS_PHASE2_SHIELD_RATIO));
+              phaseFourBoss.finalBossPhase2ShieldUsed = true;
+              phaseFourBoss.finalBossPhase2ShieldMaxHp = shieldMaxHp;
+              phaseFourBoss.finalBossPhase2ShieldHp = shieldMaxHp;
+              phaseFourBoss.finalBossPhase2ShieldEndsAtMs = gameNow + FINAL_BOSS_PHASE2_SHIELD_DURATION_MS;
+              phaseFourBoss.finalBossPhase2NextShieldAtMs = undefined;
+            } else if (skill === "freeze_mark") {
+              const targets = [...unitsRef.current].sort(() => Math.random() - 0.5).slice(0, 3);
+              phaseFourBoss.finalBossPhase2MarkTargetIds = targets.map((unit) => unit.id);
+              phaseFourBoss.finalBossPhase2MarkImpactAtMs = gameNow + FINAL_BOSS_PHASE2_MARK_WARNING_MS;
+            } else if (skill === "sky_dive") {
+              const targetUnit = unitsRef.current[Math.floor(Math.random() * unitsRef.current.length)];
+              const [targetRow, targetCol] = toRC(targetUnit.cell);
+              const targetPathIndex = path.reduce((closestIndex, cell, index) => {
+                const [row, col] = toRC(cell);
+                const [closestRow, closestCol] = toRC(path[closestIndex] ?? start);
+                return Math.hypot(row - targetRow, col - targetCol) < Math.hypot(closestRow - targetRow, closestCol - targetCol)
+                  ? index
+                  : closestIndex;
+              }, 0);
+              phaseFourBoss.finalBossPhase3DiveTargetCell = path[targetPathIndex] ?? start;
+              phaseFourBoss.finalBossPhase3DiveImpactAtMs = gameNow + FINAL_BOSS_PHASE3_DIVE_WARNING_MS;
+            } else {
+              phaseFourBoss.slowUntilMs = undefined;
+              phaseFourBoss.paralyzeUntilMs = undefined;
+              phaseFourBoss.bleedUntilMs = undefined;
+              phaseFourBoss.bleedNextTickMs = undefined;
+              phaseFourBoss.bleedSourceUnitId = undefined;
+              phaseFourBoss.magicMarkUntilMs = undefined;
+              phaseFourBoss.magicMarkTier = undefined;
+              phaseFourBoss.burnEffectUntilMs = undefined;
+              phaseFourBoss.statusImmunityUntilMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_IMMUNITY_MS;
+              phaseFourBoss.finalBossPhase3CleanseEffectUntilMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_IMMUNITY_MS;
+            }
+          });
+          setUnits([...unitsRef.current]);
+          const comboName = selectedSkills.map((skill) => skillNames[skill]).join(" · ");
+          setStatus(`👑 권능 폭주! ${comboName} 동시 발동!`);
+          addLog(`FINAL BOSS 4페이즈 권능 폭주: ${comboName}`);
+        }
+      }
+
+      const phaseOneBoss = monstersRef.current.find((monster) =>
+        monster.isFinalBoss && monster.hp > 0 && monster.finalBossMode === "combat" && monster.finalBossPhase === 1
+      );
+      if (phaseOneBoss) {
+        if (phaseOneBoss.finalBossNextSkillAtMs === undefined) {
+          phaseOneBoss.finalBossNextSkillAtMs = gameNow + FINAL_BOSS_PHASE1_SKILL_COOLDOWN_MS;
+        } else if (gameNow >= phaseOneBoss.finalBossNextSkillAtMs && unitsRef.current.length > 0) {
+          const bossRoute = phaseOneBoss.route ?? path;
+          const bossFrom = bossRoute[Math.min(phaseOneBoss.pathStep, bossRoute.length - 1)] ?? start;
+          const bossTo = bossRoute[Math.min(phaseOneBoss.pathStep + 1, bossRoute.length - 1)] ?? bossFrom;
+          const [bossFromRow, bossFromCol] = toRC(bossFrom);
+          const [bossToRow, bossToCol] = toRC(bossTo);
+          const bossRow = bossFromRow + (bossToRow - bossFromRow) * phaseOneBoss.progress;
+          const bossCol = bossFromCol + (bossToCol - bossFromCol) * phaseOneBoss.progress;
+          const closestUnit = [...unitsRef.current].sort((a, b) => {
+            const [aRow, aCol] = toRC(a.cell);
+            const [bRow, bCol] = toRC(b.cell);
+            return Math.hypot(aRow - bossRow, aCol - bossCol) - Math.hypot(bRow - bossRow, bCol - bossCol);
+          })[0];
+          const skillRoll = Math.floor(Math.random() * 3);
+          phaseOneBoss.finalBossNextSkillAtMs = gameNow + FINAL_BOSS_PHASE1_SKILL_COOLDOWN_MS;
+          phaseOneBoss.finalBossSkillCastUntilMs = undefined;
+
+          if (skillRoll === 0) {
+            const [targetRow, targetCol] = toRC(closestUnit.cell);
+            const rowDirection = Math.abs(targetRow - bossRow) < 0.35 ? 0 : Math.sign(targetRow - bossRow);
+            const colDirection = Math.abs(targetCol - bossCol) < 0.35 ? 0 : Math.sign(targetCol - bossCol);
+            const directionRow = rowDirection === 0 && colDirection === 0 ? 0 : rowDirection;
+            const directionCol = rowDirection === 0 && colDirection === 0 ? 1 : colDirection;
+            const slashLength = directionRow !== 0 && directionCol !== 0 ? 2 : 3;
+            const directionMagnitude = Math.hypot(directionRow, directionCol);
+            let stunnedCount = 0;
+            for (const unit of unitsRef.current) {
+              const [unitRow, unitCol] = toRC(unit.cell);
+              const relativeRow = unitRow - targetRow;
+              const relativeCol = unitCol - targetCol;
+              const forward = (relativeRow * directionRow + relativeCol * directionCol) / directionMagnitude;
+              const side = Math.abs(relativeRow * directionCol - relativeCol * directionRow) / directionMagnitude;
+              if (forward < -0.35 || forward > slashLength - 0.65 || side > 0.62) continue;
+              unit.stunnedUntilMs = Math.max(unit.stunnedUntilMs ?? 0, gameNow + FINAL_BOSS_SPACE_SLASH_STUN_MS);
+              unit.finalBossSlashHitUntilMs = gameNow + 700;
+              stunnedCount += 1;
+            }
+            phaseOneBoss.finalBossSkillKind = "space_slash";
+            phaseOneBoss.finalBossSkillOriginRow = targetRow;
+            phaseOneBoss.finalBossSkillOriginCol = targetCol;
+            phaseOneBoss.finalBossSkillDirectionRow = directionRow;
+            phaseOneBoss.finalBossSkillDirectionCol = directionCol;
+            phaseOneBoss.finalBossSkillLength = slashLength;
+            phaseOneBoss.finalBossSkillEffectUntilMs = gameNow + 950;
+            setStatus(`⚔️ 공간참! 범위 안의 유닛 ${stunnedCount}기가 5초간 기절합니다.`);
+          } else if (skillRoll === 1) {
+            const [targetRow, targetCol] = toRC(closestUnit.cell);
+            const areaRowStart = targetRow - 1;
+            const areaColStart = targetCol - 1;
+            let sealedCount = 0;
+            for (const unit of unitsRef.current) {
+              const [unitRow, unitCol] = toRC(unit.cell);
+              if (unitRow < areaRowStart || unitRow >= areaRowStart + 2 || unitCol < areaColStart || unitCol >= areaColStart + 3) continue;
+              unit.manaBurnUntilMs = Math.max(unit.manaBurnUntilMs ?? 0, gameNow + FINAL_BOSS_MANA_BURN_MS);
+              const fullSkillCooldown = unit.tier >= 3 && unit.typeId === "swordsman"
+                ? TIER3_SWORDSMAN_COMBO_COOLDOWN_MS
+                : unit.tier >= 3
+                  ? TIER3_ACTIVE_SKILL_COOLDOWN[unit.typeId] ?? ACTIVE_SKILL_FULL_COOLDOWN[unit.typeId]
+                  : ACTIVE_SKILL_FULL_COOLDOWN[unit.typeId];
+              if (fullSkillCooldown !== undefined) {
+                unit.activeSkillCooldownMs = fullSkillCooldown;
+              }
+              if (unit.tier >= 3 && unit.typeId === "lightning_mage") {
+                unit.heavenlyJudgmentNextAtMs = gameNow + 5000;
+              }
+              sealedCount += 1;
+            }
+            phaseOneBoss.finalBossSkillKind = "mana_burn";
+            phaseOneBoss.finalBossSkillAreaRowStart = areaRowStart;
+            phaseOneBoss.finalBossSkillAreaColStart = areaColStart;
+            phaseOneBoss.finalBossSkillEffectUntilMs = gameNow + FINAL_BOSS_MANA_BURN_MS;
+            setStatus(`🔥 마력 연소! 유닛 ${sealedCount}기의 스킬 쿨타임이 초기화되고 5초간 봉인됩니다.`);
+          } else {
+            const targets = [...unitsRef.current]
+              .sort((a, b) => (waveDamageRef.current[b.id] ?? 0) - (waveDamageRef.current[a.id] ?? 0))
+              .slice(0, 3);
+            targets.forEach((unit) => {
+              unit.basicAttackSealUntilMs = Math.max(unit.basicAttackSealUntilMs ?? 0, gameNow + FINAL_BOSS_SUPPRESSIVE_FIRE_MS);
+            });
+            phaseOneBoss.finalBossSkillKind = "suppressive_fire";
+            phaseOneBoss.finalBossSkillEffectUntilMs = gameNow + FINAL_BOSS_SUPPRESSIVE_FIRE_MS;
+            setStatus(`🎯 제압 사격! 누적 피해량 상위 유닛 ${targets.length}기의 기본 공격이 5초간 봉인됩니다.`);
+          }
+          setUnits([...unitsRef.current]);
+          addLog(`최종 보스가 ${skillRoll === 0 ? "공간참" : skillRoll === 1 ? "마력 연소" : "제압 사격"}을 사용했습니다.`);
+        }
+      }
+
+      const phaseTwoBoss = monstersRef.current.find((monster) =>
+        monster.isFinalBoss && monster.hp > 0 && monster.finalBossMode === "combat" &&
+        (monster.finalBossPhase === 2 || monster.finalBossPhase === 4)
+      );
+      if (phaseTwoBoss) {
+        const usesPhaseTwoAutomaticCycle = phaseTwoBoss.finalBossPhase === 2;
+        let stackDecayed = false;
+        unitsRef.current.forEach((unit) => {
+          if (
+            (unit.finalBossFreezeStacks ?? 0) <= 0 ||
+            unit.finalBossFreezeStackExpiresAtMs === undefined ||
+            gameNow < unit.finalBossFreezeStackExpiresAtMs
+          ) return;
+          unit.finalBossFreezeStacks = Math.max(0, (unit.finalBossFreezeStacks ?? 0) - 1);
+          unit.finalBossFreezeStackExpiresAtMs = (unit.finalBossFreezeStacks ?? 0) > 0
+            ? gameNow + 5000
+            : undefined;
+          stackDecayed = true;
+        });
+        if (stackDecayed) setUnits([...unitsRef.current]);
+
+        if (
+          phaseTwoBoss.finalBossPhase2MarkImpactAtMs !== undefined &&
+          gameNow >= phaseTwoBoss.finalBossPhase2MarkImpactAtMs
+        ) {
+          const targetIds = new Set(phaseTwoBoss.finalBossPhase2MarkTargetIds ?? []);
+          const targets = unitsRef.current.filter((unit) => targetIds.has(unit.id));
+          targets.forEach(addFinalBossFreezeStack);
+          phaseTwoBoss.finalBossPhase2MarkTargetIds = undefined;
+          phaseTwoBoss.finalBossPhase2MarkImpactAtMs = undefined;
+          setUnits([...unitsRef.current]);
+          setStatus(`🧊 빙결 표식 낙하! 아군 ${targets.length}기에 빙결 스택이 쌓였습니다.`);
+        }
+        if (usesPhaseTwoAutomaticCycle && phaseTwoBoss.finalBossPhase2NextMarkAtMs === undefined) {
+          phaseTwoBoss.finalBossPhase2NextMarkAtMs = gameNow + FINAL_BOSS_PHASE2_MARK_INTERVAL_MS;
+        } else if (
+          usesPhaseTwoAutomaticCycle &&
+          gameNow >= phaseTwoBoss.finalBossPhase2NextMarkAtMs &&
+          phaseTwoBoss.finalBossPhase2MarkImpactAtMs === undefined &&
+          unitsRef.current.length > 0
+        ) {
+          const targets = [...unitsRef.current].sort(() => Math.random() - 0.5).slice(0, 3);
+          phaseTwoBoss.finalBossPhase2MarkTargetIds = targets.map((unit) => unit.id);
+          phaseTwoBoss.finalBossPhase2MarkImpactAtMs = gameNow + FINAL_BOSS_PHASE2_MARK_WARNING_MS;
+          phaseTwoBoss.finalBossPhase2NextMarkAtMs += FINAL_BOSS_PHASE2_MARK_INTERVAL_MS;
+          setStatus(`⚠️ 빙결 표식! 무작위 아군 ${targets.length}기의 위치에 얼음 덩어리가 낙하합니다.`);
+        }
+        if (
+          phaseTwoBoss.finalBossPhase2ShotgunAtMs !== undefined &&
+          gameNow >= phaseTwoBoss.finalBossPhase2ShotgunAtMs
+        ) fireFinalBossPhase2Shotgun(phaseTwoBoss);
+        if ((phaseTwoBoss.finalBossPhase2ShieldHp ?? 0) > 0) {
+          if (
+            phaseTwoBoss.finalBossPhase2ShieldEndsAtMs !== undefined &&
+            gameNow >= phaseTwoBoss.finalBossPhase2ShieldEndsAtMs
+          ) {
+            const remainingShield = phaseTwoBoss.finalBossPhase2ShieldHp ?? 0;
+            phaseTwoBoss.hp = Math.min(phaseTwoBoss.maxHp, phaseTwoBoss.hp + remainingShield);
+            phaseTwoBoss.finalBossPhase2ShieldHp = 0;
+            phaseTwoBoss.finalBossPhase2ShieldEndsAtMs = undefined;
+            phaseTwoBoss.finalBossPhase2ShotgunAtMs = gameNow + FINAL_BOSS_PHASE2_SHOTGUN_DELAY_MS;
+            setStatus(`🧊 갑주 흡수! 남은 보호막 ${Math.ceil(remainingShield).toLocaleString()}만큼 회복하고 얼음 산탄을 준비합니다.`);
+            addLog(`최종 보스가 남은 빙결 갑주를 흡수해 ${Math.ceil(remainingShield).toLocaleString()} HP를 회복했습니다.`);
+          }
+        } else if (usesPhaseTwoAutomaticCycle && !phaseTwoBoss.finalBossPhase2ShieldUsed && phaseTwoBoss.finalBossPhase2NextShieldAtMs === undefined) {
+          phaseTwoBoss.finalBossPhase2NextShieldAtMs = gameNow + FINAL_BOSS_PHASE2_FIRST_SHIELD_DELAY_MS;
+        } else if (usesPhaseTwoAutomaticCycle && !phaseTwoBoss.finalBossPhase2ShieldUsed && gameNow >= (phaseTwoBoss.finalBossPhase2NextShieldAtMs ?? Number.POSITIVE_INFINITY)) {
+          const shieldMaxHp = Math.max(1, Math.round(phaseTwoBoss.maxHp * FINAL_BOSS_PHASE2_SHIELD_RATIO));
+          phaseTwoBoss.finalBossPhase2ShieldUsed = true;
+          phaseTwoBoss.finalBossPhase2ShieldMaxHp = shieldMaxHp;
+          phaseTwoBoss.finalBossPhase2ShieldHp = shieldMaxHp;
+          phaseTwoBoss.finalBossPhase2ShieldEndsAtMs = gameNow + FINAL_BOSS_PHASE2_SHIELD_DURATION_MS;
+          phaseTwoBoss.finalBossPhase2NextShieldAtMs = undefined;
+          setStatus(`🧊 빙결 갑주! 10초 안에 보호막 ${shieldMaxHp.toLocaleString()}을 파괴하세요.`);
+          addLog("최종 보스가 현재 페이즈 최대 체력 20%의 빙결 갑주를 전개했습니다.");
+        }
+      }
+
+      const phaseThreeBoss = monstersRef.current.find((monster) =>
+        monster.isFinalBoss && monster.hp > 0 && monster.finalBossMode === "combat" &&
+        (monster.finalBossPhase === 3 || monster.finalBossPhase === 4)
+      );
+      if (phaseThreeBoss) {
+        const usesPhaseThreeAutomaticCycle = phaseThreeBoss.finalBossPhase === 3;
+        if (usesPhaseThreeAutomaticCycle && phaseThreeBoss.finalBossPhase3NextCleanseAtMs === undefined) {
+          phaseThreeBoss.finalBossPhase3NextCleanseAtMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_COOLDOWN_MS;
+        } else if (usesPhaseThreeAutomaticCycle && gameNow >= phaseThreeBoss.finalBossPhase3NextCleanseAtMs) {
+          phaseThreeBoss.slowUntilMs = undefined;
+          phaseThreeBoss.paralyzeUntilMs = undefined;
+          phaseThreeBoss.bleedUntilMs = undefined;
+          phaseThreeBoss.bleedNextTickMs = undefined;
+          phaseThreeBoss.bleedSourceUnitId = undefined;
+          phaseThreeBoss.magicMarkUntilMs = undefined;
+          phaseThreeBoss.magicMarkTier = undefined;
+          phaseThreeBoss.burnEffectUntilMs = undefined;
+          phaseThreeBoss.statusImmunityUntilMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_IMMUNITY_MS;
+          phaseThreeBoss.finalBossPhase3CleanseEffectUntilMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_IMMUNITY_MS;
+          phaseThreeBoss.finalBossPhase3NextCleanseAtMs += FINAL_BOSS_PHASE3_CLEANSE_COOLDOWN_MS;
+          setStatus("🪽 광휘의 탈피! 모든 약화 효과를 해제하고 5초간 상태이상에 면역이 됩니다.");
+          addLog("최종 보스가 광휘의 탈피로 모든 디버프를 제거했습니다.");
+        }
+
+        if (usesPhaseThreeAutomaticCycle && phaseThreeBoss.finalBossPhase3NextDiveAtMs === undefined) {
+          phaseThreeBoss.finalBossPhase3NextDiveAtMs = gameNow + FINAL_BOSS_PHASE3_FIRST_DIVE_DELAY_MS;
+        } else if (
+          usesPhaseThreeAutomaticCycle &&
+          gameNow >= phaseThreeBoss.finalBossPhase3NextDiveAtMs &&
+          phaseThreeBoss.finalBossPhase3DiveImpactAtMs === undefined &&
+          unitsRef.current.length > 0
+        ) {
+          const targetUnit = unitsRef.current[Math.floor(Math.random() * unitsRef.current.length)];
+          const [targetRow, targetCol] = toRC(targetUnit.cell);
+          const targetPathIndex = path.reduce((closestIndex, cell, index) => {
+            const [row, col] = toRC(cell);
+            const [closestRow, closestCol] = toRC(path[closestIndex] ?? start);
+            return Math.hypot(row - targetRow, col - targetCol) < Math.hypot(closestRow - targetRow, closestCol - targetCol)
+              ? index
+              : closestIndex;
+          }, 0);
+          phaseThreeBoss.finalBossPhase3DiveTargetCell = path[targetPathIndex] ?? start;
+          phaseThreeBoss.finalBossPhase3DiveImpactAtMs = gameNow + FINAL_BOSS_PHASE3_DIVE_WARNING_MS;
+          phaseThreeBoss.finalBossPhase3NextDiveAtMs = undefined;
+          setStatus("⚠️ 급강하! 무작위 아군 근처의 길을 향해 내려꽂힙니다.");
+        }
+
+        if (
+          phaseThreeBoss.finalBossPhase3DiveImpactAtMs !== undefined &&
+          gameNow >= phaseThreeBoss.finalBossPhase3DiveImpactAtMs
+        ) {
+          const targetCell = phaseThreeBoss.finalBossPhase3DiveTargetCell ?? start;
+          const targetPathIndex = Math.max(0, path.indexOf(targetCell));
+          const [impactRow, impactCol] = toRC(targetCell);
+          const impactAreaRow = Math.max(0, Math.min(ROWS - 2, impactRow - 1));
+          const impactAreaCol = Math.max(0, Math.min(COLS - 2, impactCol - 1));
+          phaseThreeBoss.route = undefined;
+          phaseThreeBoss.pathStep = targetPathIndex;
+          phaseThreeBoss.progress = 0;
+          phaseThreeBoss.finalBossPhase3DiveImpactAtMs = undefined;
+          phaseThreeBoss.finalBossPhase3ImpactUntilMs = gameNow + 650;
+          phaseThreeBoss.finalBossPhase3StopUntilMs = gameNow + FINAL_BOSS_PHASE3_BARRAGE_STOP_MS;
+          phaseThreeBoss.finalBossPhase3NextDiveAtMs = usesPhaseThreeAutomaticCycle
+            ? gameNow + FINAL_BOSS_PHASE3_DIVE_COOLDOWN_MS
+            : undefined;
+          const initialDirections = [
+            [-1, 0], [1, 0], [0, -1], [0, 1],
+            [-1, -1], [-1, 1], [1, -1], [1, 1],
+          ];
+          phaseThreeBoss.finalBossPhase3Feathers = initialDirections.map(([directionRow, directionCol], index) => ({
+            id: index,
+            row: impactRow,
+            col: impactCol,
+            directionRow,
+            directionCol,
+            stepsRemaining: 3,
+            nextMoveAtMs: gameNow + 120 + index * 40,
+          }));
+          let stunnedCount = 0;
+          unitsRef.current.forEach((unit) => {
+            const [unitRow, unitCol] = toRC(unit.cell);
+            if (
+              unitRow < impactAreaRow || unitRow >= impactAreaRow + 2 ||
+              unitCol < impactAreaCol || unitCol >= impactAreaCol + 2
+            ) return;
+            unit.stunnedUntilMs = Math.max(unit.stunnedUntilMs ?? 0, gameNow + FINAL_BOSS_PHASE3_DIVE_STUN_MS);
+            unit.finalBossSlashHitUntilMs = gameNow + 650;
+            stunnedCount += 1;
+          });
+          setUnits([...unitsRef.current]);
+          setStatus(`⚡ 급강하 충격! 아군 ${stunnedCount}기가 5초간 기절하고 깃털 탄막이 펼쳐집니다.`);
+        }
+
+        const feathers = phaseThreeBoss.finalBossPhase3Feathers ?? [];
+        const nextFeathers: typeof feathers = [];
+        const cardinalDirections = [
+          [-1, 0], [1, 0], [0, -1], [0, 1],
+          [-1, -1], [-1, 1], [1, -1], [1, 1],
+        ];
+        for (const feather of feathers) {
+          if (feather.stepsRemaining <= 0) continue;
+          if (gameNow >= feather.nextMoveAtMs) {
+            const candidates = cardinalDirections.filter(([row, col]) => {
+              const nextRow = feather.row + row;
+              const nextCol = feather.col + col;
+              return nextRow >= 0 && nextRow < ROWS && nextCol >= 0 && nextCol < COLS;
+            });
+            const preferredDirection = candidates.find(
+              ([row, col]) => row === feather.directionRow && col === feather.directionCol,
+            );
+            const [nextDirectionRow, nextDirectionCol] = feather.stepsRemaining === 3 && preferredDirection
+              ? preferredDirection
+              : candidates[Math.floor(Math.random() * candidates.length)] ?? [feather.directionRow, feather.directionCol];
+            feather.directionRow = nextDirectionRow;
+            feather.directionCol = nextDirectionCol;
+            feather.row += nextDirectionRow;
+            feather.col += nextDirectionCol;
+            feather.stepsRemaining -= 1;
+            feather.nextMoveAtMs = gameNow + FINAL_BOSS_PHASE3_FEATHER_STEP_MS;
+            unitsRef.current.forEach((unit) => {
+              const [unitRow, unitCol] = toRC(unit.cell);
+              if (unitRow !== feather.row || unitCol !== feather.col) return;
+              unit.finalBossFeatherDebuffUntilMs = gameNow + FINAL_BOSS_PHASE3_FEATHER_DEBUFF_MS;
+              unit.finalBossFeatherHitUntilMs = gameNow + 500;
+            });
+          }
+          if (feather.stepsRemaining > 0) nextFeathers.push(feather);
+        }
+        phaseThreeBoss.finalBossPhase3Feathers = nextFeathers;
+      }
+
       for (const m of monstersRef.current) {
         if (
           m.isFinalBoss &&
@@ -2144,6 +2718,41 @@ export default function RogueTdPage() {
                   ? gameNow + 5000
                   : undefined;
                 m.statusImmunityUntilMs = gameNow + 800;
+                m.finalBossNextSkillAtMs = nextPhase === 1 ? gameNow + FINAL_BOSS_PHASE1_SKILL_COOLDOWN_MS : undefined;
+                m.finalBossPhase2NextShieldAtMs = nextPhase === 2 ? gameNow + FINAL_BOSS_PHASE2_FIRST_SHIELD_DELAY_MS : undefined;
+                m.finalBossPhase2ShieldHp = undefined;
+                m.finalBossPhase2ShieldMaxHp = undefined;
+                m.finalBossPhase2ShieldEndsAtMs = undefined;
+                m.finalBossPhase2ShieldUsed = false;
+                m.finalBossPhase2ShotgunAtMs = undefined;
+                m.finalBossPhase2ShotgunEffectUntilMs = undefined;
+                m.finalBossPhase2NextMarkAtMs = nextPhase === 2 ? gameNow + FINAL_BOSS_PHASE2_MARK_INTERVAL_MS : undefined;
+                m.finalBossPhase2MarkTargetIds = undefined;
+                m.finalBossPhase2MarkImpactAtMs = undefined;
+                m.finalBossPhase2StunnedUntilMs = undefined;
+                m.finalBossPhase2GlacierUntilMs = undefined;
+                m.finalBossPhase3NextDiveAtMs = nextPhase === 3 ? gameNow + FINAL_BOSS_PHASE3_FIRST_DIVE_DELAY_MS : undefined;
+                m.finalBossPhase3DiveImpactAtMs = undefined;
+                m.finalBossPhase3DiveTargetCell = undefined;
+                m.finalBossPhase3StopUntilMs = undefined;
+                m.finalBossPhase3ImpactUntilMs = undefined;
+                m.finalBossPhase3NextCleanseAtMs = nextPhase === 3 ? gameNow + FINAL_BOSS_PHASE3_CLEANSE_COOLDOWN_MS : undefined;
+                m.finalBossPhase3CleanseEffectUntilMs = undefined;
+                m.finalBossPhase3Feathers = undefined;
+                m.finalBossPhase4NextComboAtMs = nextPhase === 4 ? gameNow + FINAL_BOSS_PHASE4_COMBO_INTERVAL_MS : undefined;
+                m.finalBossPhase4SpaceSlashUntilMs = undefined;
+                m.finalBossPhase4ManaBurnUntilMs = undefined;
+                unitsRef.current.forEach((unit) => {
+                  unit.finalBossFreezeStacks = 0;
+                  unit.finalBossFreezeStackExpiresAtMs = undefined;
+                  unit.finalBossFrozenUntilMs = undefined;
+                  unit.finalBossFrostHitUntilMs = undefined;
+                  unit.finalBossFeatherDebuffUntilMs = undefined;
+                  unit.finalBossFeatherHitUntilMs = undefined;
+                });
+                m.finalBossSkillCastUntilMs = undefined;
+                m.finalBossSkillEffectUntilMs = undefined;
+                m.finalBossSkillKind = undefined;
                 const phaseName = nextPhase === 1 ? "인간형" : nextPhase === 2 ? "육지형" : nextPhase === 3 ? "조류형" : "???";
                 setStatus(`👑 최종 보스 ${nextPhase}페이즈 · ${phaseName} 전투가 시작됩니다!`);
                 addLog(`FINAL BOSS ${nextPhase}페이즈가 시작되었습니다.`);
@@ -2181,6 +2790,9 @@ export default function RogueTdPage() {
           ))
           || (m.bossStage === 25 && m.stage25CastEndsAtMs !== undefined && gameNow < m.stage25CastEndsAtMs)
           || (m.bossStage === 30 && m.stage30TeleportEndsAtMs !== undefined && gameNow < m.stage30TeleportEndsAtMs)
+          || (m.finalBossPhase2StunnedUntilMs !== undefined && gameNow < m.finalBossPhase2StunnedUntilMs)
+          || (m.finalBossPhase3DiveImpactAtMs !== undefined && gameNow < m.finalBossPhase3DiveImpactAtMs)
+          || (m.finalBossPhase3StopUntilMs !== undefined && gameNow < m.finalBossPhase3StopUntilMs)
         ) {
           currentSpeed = 0;
         } else if (m.bossStage === 20 && m.stage20State === "shielded") {
@@ -2219,6 +2831,114 @@ export default function RogueTdPage() {
         setLife((currentLife) => Math.max(0, currentLife - escapedCount));
         setStatus(`🚨 몬스터 ${escapedCount}마리 탈출! Life -${escapedCount}`);
         addLog(`5바퀴를 완주한 몬스터 ${escapedCount}마리가 사라져 라이프가 ${escapedCount} 감소했습니다.`);
+      }
+
+      // 보스의 스킬 시전 및 최종 보스 페이즈 전환은 별도 연출 시간으로 진행한다.
+      // 이 동안에는 웨이브와 플레이어 전투 시간을 소비하지 않는다.
+      const bossPresentationActive = monstersRef.current.some((monster) => {
+        if (!monster.isBoss || monster.hp <= 0) return false;
+        if (monster.isFinalBoss && monster.finalBossMode !== "combat") return true;
+        if (monster.stage05SummoningUntilMs !== undefined && gameNow < monster.stage05SummoningUntilMs) return true;
+        if (monster.stage05AbsorbingUntilMs !== undefined && gameNow < monster.stage05AbsorbingUntilMs) return true;
+        if (monster.stage10StompImpactAtMs !== undefined && gameNow < monster.stage10StompImpactAtMs) return true;
+        if (monster.bossStage === 15 && (monster.stage15State === "transforming" || monster.stage15State === "hatching")) return true;
+        if (monster.stage20State === "charging" && monster.stage20CastEndsAtMs !== undefined && gameNow < monster.stage20CastEndsAtMs) return true;
+        if (monster.stage25CastEndsAtMs !== undefined && gameNow < monster.stage25CastEndsAtMs) return true;
+        if (monster.stage30TeleportEndsAtMs !== undefined && gameNow < monster.stage30TeleportEndsAtMs) return true;
+        return false;
+      });
+
+      if (bossPresentationActive) {
+        if (!finalBossTransitionActive) {
+          waveTimeRemainingMs.current += dt;
+          setWaveTimeRemainingSec(Math.ceil(waveTimeRemainingMs.current / 1000));
+        }
+
+        const shiftDeadline = (value: number | undefined) => value === undefined ? undefined : value + dt;
+        for (const unit of unitsRef.current) {
+          unit.stunnedUntilMs = shiftDeadline(unit.stunnedUntilMs);
+          unit.finalBossSlashHitUntilMs = shiftDeadline(unit.finalBossSlashHitUntilMs);
+          unit.manaBurnUntilMs = shiftDeadline(unit.manaBurnUntilMs);
+          unit.basicAttackSealUntilMs = shiftDeadline(unit.basicAttackSealUntilMs);
+          unit.finalBossAttackSlowUntilMs = shiftDeadline(unit.finalBossAttackSlowUntilMs);
+          unit.finalBossFrostHitUntilMs = shiftDeadline(unit.finalBossFrostHitUntilMs);
+          unit.finalBossFrozenUntilMs = shiftDeadline(unit.finalBossFrozenUntilMs);
+          unit.finalBossFreezeStackExpiresAtMs = shiftDeadline(unit.finalBossFreezeStackExpiresAtMs);
+          unit.finalBossFeatherDebuffUntilMs = shiftDeadline(unit.finalBossFeatherDebuffUntilMs);
+          unit.finalBossFeatherHitUntilMs = shiftDeadline(unit.finalBossFeatherHitUntilMs);
+          unit.skillEffectUntilMs = shiftDeadline(unit.skillEffectUntilMs);
+          unit.tier3RangerEffectUntilMs = shiftDeadline(unit.tier3RangerEffectUntilMs);
+          unit.swordsmanWaveUntilMs = shiftDeadline(unit.swordsmanWaveUntilMs);
+          unit.adrenalinePhaseUntilMs = shiftDeadline(unit.adrenalinePhaseUntilMs);
+          unit.frozenOrbUntilMs = shiftDeadline(unit.frozenOrbUntilMs);
+          unit.frozenOrbNextTickMs = shiftDeadline(unit.frozenOrbNextTickMs);
+          unit.frozenOrbExplosionUntilMs = shiftDeadline(unit.frozenOrbExplosionUntilMs);
+          unit.heavenlyJudgmentNextAtMs = shiftDeadline(unit.heavenlyJudgmentNextAtMs);
+          unit.frozenOrbTrailCells = unit.frozenOrbTrailCells?.map((trail) => ({
+            ...trail,
+            untilMs: trail.untilMs + dt,
+          }));
+        }
+        for (const monster of monstersRef.current) {
+          monster.lastHitTime = shiftDeadline(monster.lastHitTime);
+          monster.statusImmunityUntilMs = shiftDeadline(monster.statusImmunityUntilMs);
+          monster.slowUntilMs = shiftDeadline(monster.slowUntilMs);
+          monster.paralyzeUntilMs = shiftDeadline(monster.paralyzeUntilMs);
+          monster.burnEffectUntilMs = shiftDeadline(monster.burnEffectUntilMs);
+          monster.sniperImpactUntilMs = shiftDeadline(monster.sniperImpactUntilMs);
+          monster.bleedUntilMs = shiftDeadline(monster.bleedUntilMs);
+          monster.bleedNextTickMs = shiftDeadline(monster.bleedNextTickMs);
+          monster.magicMarkUntilMs = shiftDeadline(monster.magicMarkUntilMs);
+          monster.chainHitUntilMs = shiftDeadline(monster.chainHitUntilMs);
+          monster.swordsmanComboHitUntilMs = shiftDeadline(monster.swordsmanComboHitUntilMs);
+          monster.tier3EffectUntilMs = shiftDeadline(monster.tier3EffectUntilMs);
+          monster.tier3MageEffectUntilMs = shiftDeadline(monster.tier3MageEffectUntilMs);
+          monster.heavenlyWarningUntilMs = shiftDeadline(monster.heavenlyWarningUntilMs);
+          monster.firePillarUntilMs = shiftDeadline(monster.firePillarUntilMs);
+          monster.firePillarNextTickMs = shiftDeadline(monster.firePillarNextTickMs);
+          monster.finalBossNextSkillAtMs = shiftDeadline(monster.finalBossNextSkillAtMs);
+          monster.finalBossSkillEffectUntilMs = shiftDeadline(monster.finalBossSkillEffectUntilMs);
+          monster.finalBossPhase2NextShieldAtMs = shiftDeadline(monster.finalBossPhase2NextShieldAtMs);
+          monster.finalBossPhase2ShieldEndsAtMs = shiftDeadline(monster.finalBossPhase2ShieldEndsAtMs);
+          monster.finalBossPhase2ShieldHitUntilMs = shiftDeadline(monster.finalBossPhase2ShieldHitUntilMs);
+          monster.finalBossPhase2ShieldBreakUntilMs = shiftDeadline(monster.finalBossPhase2ShieldBreakUntilMs);
+          monster.finalBossPhase2StunnedUntilMs = shiftDeadline(monster.finalBossPhase2StunnedUntilMs);
+          monster.finalBossPhase2GlacierUntilMs = shiftDeadline(monster.finalBossPhase2GlacierUntilMs);
+          monster.finalBossPhase2ShotgunAtMs = shiftDeadline(monster.finalBossPhase2ShotgunAtMs);
+          monster.finalBossPhase2ShotgunEffectUntilMs = shiftDeadline(monster.finalBossPhase2ShotgunEffectUntilMs);
+          monster.finalBossPhase2NextMarkAtMs = shiftDeadline(monster.finalBossPhase2NextMarkAtMs);
+          monster.finalBossPhase2MarkImpactAtMs = shiftDeadline(monster.finalBossPhase2MarkImpactAtMs);
+          monster.finalBossPhase3NextDiveAtMs = shiftDeadline(monster.finalBossPhase3NextDiveAtMs);
+          monster.finalBossPhase3DiveImpactAtMs = shiftDeadline(monster.finalBossPhase3DiveImpactAtMs);
+          monster.finalBossPhase3StopUntilMs = shiftDeadline(monster.finalBossPhase3StopUntilMs);
+          monster.finalBossPhase3ImpactUntilMs = shiftDeadline(monster.finalBossPhase3ImpactUntilMs);
+          monster.finalBossPhase3NextCleanseAtMs = shiftDeadline(monster.finalBossPhase3NextCleanseAtMs);
+          monster.finalBossPhase3CleanseEffectUntilMs = shiftDeadline(monster.finalBossPhase3CleanseEffectUntilMs);
+          monster.finalBossPhase4NextComboAtMs = shiftDeadline(monster.finalBossPhase4NextComboAtMs);
+          monster.finalBossPhase4SpaceSlashUntilMs = shiftDeadline(monster.finalBossPhase4SpaceSlashUntilMs);
+          monster.finalBossPhase4ManaBurnUntilMs = shiftDeadline(monster.finalBossPhase4ManaBurnUntilMs);
+          monster.finalBossPhase3Feathers = monster.finalBossPhase3Feathers?.map((feather) => ({
+            ...feather,
+            nextMoveAtMs: feather.nextMoveAtMs + dt,
+          }));
+        }
+        tier3FirePillarsRef.current.forEach((pillar) => {
+          pillar.nextTickMs += dt;
+          pillar.untilMs += dt;
+        });
+        pendingHeavenlyStrikesRef.current.forEach((strike) => {
+          strike.impactAtMs += dt;
+        });
+        (Object.keys(ultimateNextRollAtRef.current) as UnitClass[]).forEach((unitClass) => {
+          ultimateNextRollAtRef.current[unitClass] += dt;
+        });
+
+        setMonsters([...monstersRef.current]);
+        setUnits([...unitsRef.current]);
+        setProjectiles([...projectilesRef.current]);
+        setTier3FirePillars([...tier3FirePillarsRef.current]);
+        raf = requestAnimationFrame(frame);
+        return;
       }
 
       // 3. 투사체 이동 & 명중 판정 (상성 데미지 + 9종 유닛 스킬 + 1초 상태이상 공통 면역)
@@ -2264,6 +2984,39 @@ export default function RogueTdPage() {
           m.stage05BeingAbsorbed ||
           (m.bossStage === 15 && (stage15State === "transforming" || stage15State === "hatching"))
         ) return 0;
+        const sourceUnit = unitsRef.current.find((unit) => unit.id === sourceUnitId);
+        if (sourceUnit?.finalBossFeatherDebuffUntilMs && gameNow < sourceUnit.finalBossFeatherDebuffUntilMs) {
+          damage *= 0.8;
+        }
+        if (
+          m.isFinalBoss &&
+          (m.finalBossPhase === 3 || m.finalBossPhase === 4) &&
+          m.finalBossPhase3CleanseEffectUntilMs !== undefined &&
+          gameNow < m.finalBossPhase3CleanseEffectUntilMs
+        ) {
+          damage *= 1 - FINAL_BOSS_PHASE3_IMMUNITY_DAMAGE_REDUCTION;
+        }
+        if (
+          m.isFinalBoss &&
+          (m.finalBossPhase === 2 || m.finalBossPhase === 4) &&
+          (m.finalBossPhase2ShieldHp ?? 0) > 0
+        ) {
+          const actualShieldDamage = Math.min(m.finalBossPhase2ShieldHp ?? 0, Math.max(1, Math.round(damage)));
+          m.finalBossPhase2ShieldHp = Math.max(0, (m.finalBossPhase2ShieldHp ?? 0) - actualShieldDamage);
+          m.finalBossPhase2ShieldHitUntilMs = gameNow + 180;
+          waveDamageRef.current[sourceUnitId] = (waveDamageRef.current[sourceUnitId] ?? 0) + actualShieldDamage;
+          m.lastHitTime = gameNow;
+          if (m.finalBossPhase2ShieldHp <= 0) {
+            m.finalBossPhase2ShieldHp = 0;
+            m.finalBossPhase2ShieldEndsAtMs = undefined;
+            m.finalBossPhase2StunnedUntilMs = gameNow + FINAL_BOSS_PHASE2_SHOTGUN_DELAY_MS;
+            m.finalBossPhase2ShotgunAtMs = gameNow + FINAL_BOSS_PHASE2_SHOTGUN_DELAY_MS;
+            m.finalBossPhase2ShieldBreakUntilMs = gameNow + FINAL_BOSS_PHASE2_SHOTGUN_DELAY_MS;
+            setStatus("💥 빙결 갑주 파괴! 보스가 1초간 멈추고 얼음 산탄을 준비합니다.");
+            addLog("빙결 갑주를 파괴해 최종 보스의 움직임을 1초간 멈췄습니다.");
+          }
+          return actualShieldDamage;
+        }
         if (
           m.bossStage === 20 &&
           (m.stage20ShieldHp ?? 0) > 0 &&
@@ -2517,7 +3270,8 @@ export default function RogueTdPage() {
               });
               if (sourceUnit?.tier && sourceUnit.tier >= 2) {
                 const markChance = sourceUnit.tier >= 3 ? 0.25 : MAGIC_MARK_CHANCE;
-                if (Math.random() < markChance) {
+                const statusImmune = targetMon.statusImmunityUntilMs !== undefined && gameNow < targetMon.statusImmunityUntilMs;
+                if (!statusImmune && Math.random() < markChance) {
                   targetMon.magicMarkUntilMs = gameNow + (sourceUnit.tier >= 3 ? 8000 : MAGIC_MARK_DURATION_MS);
                   targetMon.magicMarkTier = sourceUnit.tier;
                 }
@@ -2564,7 +3318,7 @@ export default function RogueTdPage() {
                 dealDamage(targetMon, p.damage, p.sourceUnitId);
               }
 
-              if (sourceUnit?.tier && sourceUnit.tier >= 2 && p.sourceTypeId === "fire_mage") {
+              if (!p.skillEffectsSealed && sourceUnit?.tier && sourceUnit.tier >= 2 && p.sourceTypeId === "fire_mage") {
                 const splashRatio = sourceUnit.tier >= 3 ? 0.3 : FIRE_SPLASH_RATIO;
                 nearbyMonsters
                   .filter((monster) => monster.id !== targetMon.id)
@@ -2608,7 +3362,8 @@ export default function RogueTdPage() {
                 });
               }
 
-              if (p.appliesBleed && targetMon.hp > 0) {
+              const bleedImmune = targetMon.statusImmunityUntilMs !== undefined && gameNow < targetMon.statusImmunityUntilMs;
+              if (p.appliesBleed && targetMon.hp > 0 && !bleedImmune) {
                 targetMon.bleedUntilMs = gameNow + (
                   sourceUnit?.tier && sourceUnit.tier >= 3
                     ? TIER3_DUAL_BLEED_DURATION_MS
@@ -2658,8 +3413,13 @@ export default function RogueTdPage() {
       // 4. 유닛 사격 및 투사체 생성 (9종 유닛 스킬 개별 동작)
       for (const unit of unitsRef.current) {
         const uDef = UNIT_TYPES[unit.typeId];
-        unit.cooldownMs = Math.max(0, unit.cooldownMs - dt);
-        if (unit.activeSkillCooldownMs !== undefined) {
+        const skillsSealed = unit.manaBurnUntilMs !== undefined && gameNow < unit.manaBurnUntilMs;
+        const basicAttackSealed = unit.basicAttackSealUntilMs !== undefined && gameNow < unit.basicAttackSealUntilMs;
+        const frozenByFinalBoss = unit.finalBossFrozenUntilMs !== undefined && gameNow < unit.finalBossFrozenUntilMs;
+        const freezeStackAttackSpeedRatio = Math.max(0.4, 1 - (unit.finalBossFreezeStacks ?? 0) * 0.2);
+        if (frozenByFinalBoss) continue;
+        unit.cooldownMs = Math.max(0, unit.cooldownMs - dt * freezeStackAttackSpeedRatio);
+        if (!skillsSealed && unit.activeSkillCooldownMs !== undefined) {
           unit.activeSkillCooldownMs = Math.max(0, unit.activeSkillCooldownMs - dt);
         }
         if (unit.adrenalinePhase && unit.adrenalinePhaseUntilMs !== undefined && gameNow >= unit.adrenalinePhaseUntilMs) {
@@ -2784,7 +3544,9 @@ export default function RogueTdPage() {
           if (unit.heavenlyJudgmentNextAtMs === undefined) {
             unit.heavenlyJudgmentNextAtMs = gameNow + 5000;
           }
-          if (gameNow >= unit.heavenlyJudgmentNextAtMs) {
+          if (skillsSealed) {
+            unit.heavenlyJudgmentNextAtMs += dt;
+          } else if (gameNow >= unit.heavenlyJudgmentNextAtMs) {
             const eligibleTargets = monstersRef.current.filter(
               (monster) =>
                 monster.hp > 0 &&
@@ -2817,7 +3579,10 @@ export default function RogueTdPage() {
             }
           }
         }
-        if (unit.stunnedUntilMs && gameNow < unit.stunnedUntilMs) continue;
+        if (
+          (unit.stunnedUntilMs && gameNow < unit.stunnedUntilMs) ||
+          (unit.finalBossFrozenUntilMs && gameNow < unit.finalBossFrozenUntilMs)
+        ) continue;
         if (unit.cooldownMs > 0) continue;
         const rangeTiles = unit.rangeTiles + (
           uDef.unitClass === "ranger"
@@ -2859,7 +3624,7 @@ export default function RogueTdPage() {
           continue;
         }
 
-        if (unit.tier >= 2 && (unit.activeSkillCooldownMs ?? 1) <= 0) {
+        if (!skillsSealed && unit.tier >= 2 && (unit.activeSkillCooldownMs ?? 1) <= 0) {
           if (unit.typeId === "rifleman") {
             unit.adrenalinePhase = "boost";
             unit.adrenalinePhaseUntilMs = gameNow + (unit.tier >= 3 ? 5000 : RIFLE_ADRENALINE_BOOST_MS);
@@ -2909,14 +3674,16 @@ export default function RogueTdPage() {
           : unit.adrenalinePhase === "fatigue"
             ? 0.5
             : 1;
-        unit.cooldownMs = uDef.unitClass === "warrior"
-          ? unit.attackIntervalMs / (
-              1 +
-              WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior] +
-              getUnitTierAttackSpeedBonus(unit.tier, uDef.unitClass)
-            )
-          : unit.attackIntervalMs / adrenalineAttackSpeed;
-        unit.lastAttackTimeMs = gameNow;
+        if (!basicAttackSealed) {
+          unit.cooldownMs = (uDef.unitClass === "warrior"
+            ? unit.attackIntervalMs / (
+                1 +
+                WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior] +
+                getUnitTierAttackSpeedBonus(unit.tier, uDef.unitClass)
+              )
+            : unit.attackIntervalMs / adrenalineAttackSpeed);
+          unit.lastAttackTimeMs = gameNow;
+        }
 
         // 상성 배율 계산
         const finalBossLightPenalty = target.isFinalBoss && target.finalBossMode === "combat" && (
@@ -2937,7 +3704,7 @@ export default function RogueTdPage() {
         const penalizedBaseDmg = baseDmg * finalBossLightPenalty;
         let calculatedDamage = Math.max(1, Math.round(penalizedBaseDmg * multiplier));
 
-        if (unit.tier >= 3 && (unit.activeSkillCooldownMs ?? 1) <= 0) {
+        if (!skillsSealed && unit.tier >= 3 && (unit.activeSkillCooldownMs ?? 1) <= 0) {
           if (unit.typeId === "dual_swordsman") {
             monstersRef.current.forEach((monster) => {
               if (monster.hp <= 0 || getDistance(monster) > 2) return;
@@ -2982,7 +3749,8 @@ export default function RogueTdPage() {
                 delayMs: 0,
                 durationMs: 1,
               }, monster) * 3)), unit.id);
-              if (monster.hp > 0) {
+              const statusImmune = monster.statusImmunityUntilMs !== undefined && gameNow < monster.statusImmunityUntilMs;
+              if (monster.hp > 0 && !statusImmune) {
                 monster.magicMarkUntilMs = gameNow + 8000;
                 monster.magicMarkTier = 3;
                 monster.tier3EffectUntilMs = gameNow + 650;
@@ -3062,12 +3830,12 @@ export default function RogueTdPage() {
           }
         }
 
-        if (unit.tier >= 2 && unit.typeId === "sniper" && getDistance(target) >= (unit.tier >= 3 ? 2.2 : 2.5)) {
+        if (!skillsSealed && unit.tier >= 2 && unit.typeId === "sniper" && getDistance(target) >= (unit.tier >= 3 ? 2.2 : 2.5)) {
           calculatedDamage = Math.max(1, Math.round(calculatedDamage * (unit.tier >= 3 ? TIER3_SNIPER_HAWK_EYE_DAMAGE_RATIO : 1.2)));
         }
 
         let swordsmanWave = false;
-        if (unit.tier >= 3 && unit.typeId === "swordsman") {
+        if (!skillsSealed && unit.tier >= 3 && unit.typeId === "swordsman") {
           unit.swordsmanAttackCount = (unit.swordsmanAttackCount ?? 0) + 1;
           if (unit.swordsmanAttackCount >= 4) {
             unit.swordsmanAttackCount = 0;
@@ -3076,7 +3844,7 @@ export default function RogueTdPage() {
           }
         }
 
-        if (unit.tier >= 3 && unit.typeId === "rifleman" && Math.random() < TIER3_RIFLE_CRIT_CHANCE) {
+        if (!skillsSealed && unit.tier >= 3 && unit.typeId === "rifleman" && Math.random() < TIER3_RIFLE_CRIT_CHANCE) {
           calculatedDamage = Math.max(1, Math.round(calculatedDamage * TIER3_RIFLE_CRIT_DAMAGE_RATIO));
           target.tier3EffectUntilMs = gameNow + 350;
           const [criticalRow, criticalCol] = getMonsterPos(target);
@@ -3088,7 +3856,7 @@ export default function RogueTdPage() {
 
         let swordsmanCombo = false;
         if (
-          unit.tier >= 2 &&
+          !skillsSealed && unit.tier >= 2 &&
           unit.typeId === "swordsman" &&
           (unit.activeSkillCooldownMs ?? 1) <= 0
         ) {
@@ -3102,12 +3870,21 @@ export default function RogueTdPage() {
           unit.activeSkillCooldownMs = unit.tier >= 3
             ? TIER3_SWORDSMAN_COMBO_COOLDOWN_MS
             : SWORDSMAN_COMBO_COOLDOWN_MS;
+          if (basicAttackSealed) {
+            unit.cooldownMs = (uDef.unitClass === "warrior"
+              ? unit.attackIntervalMs / (
+                  1 + WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior] +
+                  getUnitTierAttackSpeedBonus(unit.tier, uDef.unitClass)
+                )
+              : unit.attackIntervalMs / adrenalineAttackSpeed);
+            unit.lastAttackTimeMs = gameNow;
+          }
           target.swordsmanComboHitUntilMs = gameNow + 500;
           swordsmanCombo = true;
         }
 
         if (
-          unit.tier >= 2 &&
+          !skillsSealed && unit.tier >= 2 &&
           unit.typeId === "lightning_mage" &&
           (unit.activeSkillCooldownMs ?? 1) <= 0
         ) {
@@ -3155,7 +3932,7 @@ export default function RogueTdPage() {
         }
 
         if (
-          unit.tier >= 2 &&
+          !skillsSealed && unit.tier >= 2 &&
           unit.typeId === "shotgunner" &&
           (unit.activeSkillCooldownMs ?? 1) <= 0 &&
           (inRange.length >= (unit.tier >= 3 ? 4 : 5) || inRange.some((monster) => monster.isBoss))
@@ -3177,9 +3954,11 @@ export default function RogueTdPage() {
           continue;
         }
 
+        if (basicAttackSealed && !swordsmanCombo) continue;
+
         // 유닛별 투사체 이펙트 및 발사 개수 분기
         if (unit.typeId === "dual_swordsman") {
-          const appliesBleed = unit.tier >= 2 && Math.random() < (
+          const appliesBleed = !skillsSealed && unit.tier >= 2 && Math.random() < (
             unit.tier >= 3 ? TIER3_DUAL_BLEED_CHANCE : DUAL_BLEED_CHANCE
           );
           // 쌍검사: 두 타격의 합이 최종 피해량과 같도록 분배
@@ -3200,6 +3979,7 @@ export default function RogueTdPage() {
             durationMs: 140,
             effectType: "normal",
             appliesBleed,
+            skillEffectsSealed: skillsSealed,
           });
           projectilesRef.current.push({
             id: nextProjectile.current++,
@@ -3215,30 +3995,31 @@ export default function RogueTdPage() {
             delayMs: 180,
             durationMs: 200,
             effectType: "normal",
+            skillEffectsSealed: skillsSealed,
           });
         } else {
           let effectType: Projectile["effectType"] = "normal";
 
           if (
-            unit.typeId === "fire_mage" &&
+            !skillsSealed && unit.typeId === "fire_mage" &&
             Math.random() < FIRE_AREA_CHANCE + MAGE_STATUS_CHANCE_BONUS[synergy.classTiers.mage]
           ) {
             effectType = "fire";
-          } else if (unit.typeId === "magic_swordsman") {
+          } else if (!skillsSealed && unit.typeId === "magic_swordsman") {
             effectType = "magic_swordsman";
           } else if (
-            unit.typeId === "ice_mage" &&
+            !skillsSealed && unit.typeId === "ice_mage" &&
             Math.random() < ICE_SLOW_CHANCE + MAGE_STATUS_CHANCE_BONUS[synergy.classTiers.mage]
           ) {
             effectType = "ice";
           } else if (
-            unit.typeId === "lightning_mage" &&
+            !skillsSealed && unit.typeId === "lightning_mage" &&
             Math.random() < LIGHTNING_PARALYZE_CHANCE + MAGE_STATUS_CHANCE_BONUS[synergy.classTiers.mage]
           ) {
             effectType = "lightning";
           } else if (unit.typeId === "shotgunner") {
             effectType = "shotgun"; // 산탄 범위
-          } else if (unit.typeId === "sniper" && Math.random() < SNIPER_EXECUTE_CHANCE) {
+          } else if (!skillsSealed && unit.typeId === "sniper" && Math.random() < SNIPER_EXECUTE_CHANCE) {
             effectType = "sniper";
           }
 
@@ -3258,8 +4039,9 @@ export default function RogueTdPage() {
             effectType,
             skillAttack: swordsmanCombo,
             swordsmanWave,
+            skillEffectsSealed: skillsSealed,
           });
-          if (unit.tier >= 3 && unit.typeId === "shotgunner") {
+          if (!skillsSealed && unit.tier >= 3 && unit.typeId === "shotgunner") {
             unit.shotgunAttackCount = (unit.shotgunAttackCount ?? 0) + 1;
             if (unit.shotgunAttackCount >= 3) {
               unit.shotgunAttackCount = 0;
@@ -3335,6 +4117,16 @@ export default function RogueTdPage() {
         targetId: null,
         lastAttackTimeMs: undefined,
         stunnedUntilMs: undefined,
+        finalBossSlashHitUntilMs: undefined,
+        manaBurnUntilMs: undefined,
+        basicAttackSealUntilMs: undefined,
+      finalBossAttackSlowUntilMs: undefined,
+      finalBossFrostHitUntilMs: undefined,
+      finalBossFreezeStacks: 0,
+      finalBossFreezeStackExpiresAtMs: undefined,
+      finalBossFrozenUntilMs: undefined,
+      finalBossFeatherDebuffUntilMs: undefined,
+      finalBossFeatherHitUntilMs: undefined,
         activeSkillCooldownMs: undefined,
         skillEffectUntilMs: undefined,
         tier3RangerEffectUntilMs: undefined,

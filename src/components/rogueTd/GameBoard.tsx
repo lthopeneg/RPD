@@ -49,6 +49,9 @@ const FROZEN_ORB_EFFECT_IMAGE = UNIT_TIER2_SKILL_ICONS.ice_mage;
 const BLEED_EFFECT_IMAGE = new URL("../../images/bleed-skill-sheet.png", import.meta.url).href;
 const MAGIC_MARK_EFFECT_IMAGE = new URL("../../images/magic-mark-skill-sheet.png", import.meta.url).href;
 const CHAIN_LIGHTNING_EFFECT_IMAGE = new URL("../../images/chain-lightning-skill-sheet.png", import.meta.url).href;
+const FINAL_BOSS_FREEZE_PRISON_IMAGE = new URL("../../images/final-boss-freeze-prison.png", import.meta.url).href;
+const FINAL_BOSS_FREEZE_MARK_PROJECTILE_IMAGE = new URL("../../images/final-boss-freeze-mark-projectile.png", import.meta.url).href;
+const FINAL_BOSS_ICE_SHOTGUN_IMAGE = new URL("../../images/final-boss-ice-shotgun.png", import.meta.url).href;
 const TIER3_MAGE_VFX = {
   fire: new URL("../../images/tier3-mage-vfx-fire.png", import.meta.url).href,
   ice: new URL("../../images/tier3-mage-vfx-ice.png", import.meta.url).href,
@@ -273,6 +276,7 @@ export default function GameBoard(p: Props) {
   const now = p.gameNowMs;
   const finalBoss = p.monsters.find((monster) => monster.isFinalBoss);
   const finalBossMode = finalBoss?.finalBossMode;
+  const finalBossFreezeMarkTargets = new Set(finalBoss?.finalBossPhase2MarkTargetIds ?? []);
   const drainedPhase = finalBossMode === "absorbing"
     ? finalBoss?.finalBossTargetPhase
     : finalBossMode === "flash" && finalBoss?.finalBossFlashNext === "combat"
@@ -369,17 +373,27 @@ export default function GameBoard(p: Props) {
           const attackAge = u?.lastAttackTimeMs === undefined
             ? Number.POSITIVE_INFINITY
             : now - u.lastAttackTimeMs;
-          const attackMotionSpeed = u?.typeId === "rifleman"
+          const freezeStackAttackSpeedRatio = Math.max(0.4, 1 - (u?.finalBossFreezeStacks ?? 0) * 0.2);
+          const attackMotionSpeed = (u?.typeId === "rifleman"
             ? u.adrenalinePhase === "boost"
               ? 3
               : u.adrenalinePhase === "fatigue"
                 ? 0.5
                 : 1
-            : 1;
+            : 1) * freezeStackAttackSpeedRatio;
           const attackAnimationGameMs = 360 / attackMotionSpeed;
           const isStunned = Boolean(
             u?.stunnedUntilMs && now < u.stunnedUntilMs,
           );
+          const isFinalBossSlashHit = Boolean(u?.finalBossSlashHitUntilMs && now < u.finalBossSlashHitUntilMs);
+          const isManaBurned = Boolean(u?.manaBurnUntilMs && now < u.manaBurnUntilMs);
+          const isBasicAttackSealed = Boolean(u?.basicAttackSealUntilMs && now < u.basicAttackSealUntilMs);
+          const finalBossFreezeStacks = u?.finalBossFreezeStacks ?? 0;
+          const isFinalBossAttackSlowed = finalBossFreezeStacks > 0;
+          const isFinalBossFrostHit = Boolean(u?.finalBossFrostHitUntilMs && now < u.finalBossFrostHitUntilMs);
+          const isFinalBossFrozen = Boolean(u?.finalBossFrozenUntilMs && now < u.finalBossFrozenUntilMs);
+          const isFinalBossFeatherDebuffed = Boolean(u?.finalBossFeatherDebuffUntilMs && now < u.finalBossFeatherDebuffUntilMs);
+          const isFinalBossFeatherHit = Boolean(u?.finalBossFeatherHitUntilMs && now < u.finalBossFeatherHitUntilMs);
           const classes = ["cell", cell.type];
           if (i === p.start) classes.push("start");
           if (i === p.goal) classes.push("goal");
@@ -430,6 +444,11 @@ export default function GameBoard(p: Props) {
               {stage25WarningCells.has(i) && (
                 <span className="stage25CellWarning" aria-hidden="true" />
               )}
+              {u && finalBossFreezeMarkTargets.has(u.id) && (
+                <span className="finalBossFreezeMarkWarning" aria-hidden="true">
+                  <i style={{ backgroundImage: `url(${FINAL_BOSS_FREEZE_MARK_PROJECTILE_IMAGE})` }} />
+                </span>
+              )}
 
               {!u && (
                 <span className="cellContent">
@@ -442,7 +461,14 @@ export default function GameBoard(p: Props) {
               )}
 
               {u && (
-                <div className={`unitWrapper ${isStunned ? "stunned" : ""} ${u.adrenalinePhase === "boost" ? "adrenalineBoost" : ""} ${u.adrenalinePhase === "fatigue" ? "adrenalineFatigue" : ""}`} key={u.id}>
+                <>
+                {isBasicAttackSealed && <span className="finalBossSuppressiveTarget" aria-label="기본 공격 봉인"><i /></span>}
+                {isFinalBossAttackSlowed && <span className={`finalBossFreezeStackBadge ${isFinalBossFrostHit ? "hit" : ""}`} aria-label={`빙결 스택 ${finalBossFreezeStacks}`}>{finalBossFreezeStacks}</span>}
+                {isFinalBossFrozen && <span className="finalBossFreezePrison" style={{ backgroundImage: `url(${FINAL_BOSS_FREEZE_PRISON_IMAGE})` }} aria-label="최종 빙결" />}
+                {isFinalBossFeatherDebuffed && <span className={`finalBossFeatherDebuff ${isFinalBossFeatherHit ? "hit" : ""}`} aria-label="공격력 20% 감소"><i>−20%</i></span>}
+                <div className={`unitWrapper ${isStunned ? "stunned" : ""} ${isManaBurned ? "manaBurned" : ""} ${isBasicAttackSealed ? "basicAttackSealed" : ""} ${finalBossFreezeStacks > 0 ? `finalBossFreezeTint freezeStack${finalBossFreezeStacks}` : ""} ${u.adrenalinePhase === "boost" ? "adrenalineBoost" : ""} ${u.adrenalinePhase === "fatigue" ? "adrenalineFatigue" : ""}`} key={u.id}>
+                  {isFinalBossSlashHit && <span className="finalBossSlashHit" aria-hidden="true"><i /><b /></span>}
+                  {isManaBurned && <span className="finalBossManaSeal" aria-label="스킬 봉인"><i /><b /></span>}
                   {u.typeId !== "shotgunner" && u.tier3AreaKind === undefined && u.skillEffectUntilMs !== undefined && now < u.skillEffectUntilMs && (
                     <span
                       className={`tierTwoSkillBurst skill-${u.typeId}`}
@@ -534,6 +560,7 @@ export default function GameBoard(p: Props) {
                     rangerRangeBonusTiles={p.rangerRangeBonusTiles}
                   />
                 </div>
+                </>
               )}
               {i === p.activeCellIndex && p.renderCellMenu(i)}
             </div>
@@ -541,6 +568,142 @@ export default function GameBoard(p: Props) {
         })}
 
         <div className="boardSkillEffectClip" aria-hidden="true">
+        {p.monsters
+          .filter((monster) =>
+            monster.isFinalBoss && (
+              (monster.finalBossSkillKind === "space_slash" && monster.finalBossSkillEffectUntilMs !== undefined && now < monster.finalBossSkillEffectUntilMs) ||
+              (monster.finalBossPhase4SpaceSlashUntilMs !== undefined && now < monster.finalBossPhase4SpaceSlashUntilMs)
+            )
+          )
+          .map((monster) => {
+            const effectUntilMs = monster.finalBossPhase4SpaceSlashUntilMs ?? monster.finalBossSkillEffectUntilMs;
+            const originRow = monster.finalBossSkillOriginRow ?? 0;
+            const originCol = monster.finalBossSkillOriginCol ?? 0;
+            const directionRow = monster.finalBossSkillDirectionRow ?? 0;
+            const directionCol = monster.finalBossSkillDirectionCol ?? 1;
+            const waveLength = monster.finalBossSkillLength ?? 3;
+            const centerRow = originRow + (directionRow * (waveLength - 1)) / 2;
+            const centerCol = originCol + (directionCol * (waveLength - 1)) / 2;
+            const rotation = Math.atan2(directionRow, directionCol) * 180 / Math.PI;
+            const isDiagonal = directionRow !== 0 && directionCol !== 0;
+            return (
+              <span key={`final-boss-slash-${monster.id}-${effectUntilMs}`} className="finalBossSpaceSlash">
+                {Array.from({ length: waveLength }, (_, index) => (
+                  <b
+                    key={index}
+                    style={{
+                      left: `${((originCol + directionCol * index) / COLS) * 100}%`,
+                      top: `${((originRow + directionRow * index) / ROWS) * 100}%`,
+                      width: `${100 / COLS}%`,
+                      height: `${100 / ROWS}%`,
+                    }}
+                  />
+                ))}
+                <i
+                  className={isDiagonal ? "diagonal" : "straight"}
+                  style={{
+                    left: `${((centerCol + 0.5) / COLS) * 100}%`,
+                    top: `${((centerRow + 0.5) / ROWS) * 100}%`,
+                    width: `${(waveLength / COLS) * 100}%`,
+                    transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+                    backgroundImage: `url(${TIER3_WARRIOR_VFX.swordsman})`,
+                    animationDuration: `${950 / p.animationSpeed}ms`,
+                  }}
+                />
+              </span>
+            );
+          })}
+
+        {p.monsters
+          .filter((monster) => monster.isFinalBoss && monster.finalBossPhase === 3)
+          .map((monster) => {
+            const targetCell = monster.finalBossPhase3DiveTargetCell;
+            const targetRow = targetCell === undefined ? 0 : Math.floor(targetCell / COLS);
+            const targetCol = targetCell === undefined ? 0 : targetCell % COLS;
+            const impactAreaRow = Math.max(0, Math.min(ROWS - 2, targetRow - 1));
+            const impactAreaCol = Math.max(0, Math.min(COLS - 2, targetCol - 1));
+            const showDiveWarning = monster.finalBossPhase3DiveImpactAtMs !== undefined && now < monster.finalBossPhase3DiveImpactAtMs;
+            const showImpact = monster.finalBossPhase3ImpactUntilMs !== undefined && now < monster.finalBossPhase3ImpactUntilMs;
+            return (
+              <span key={`final-boss-phase3-${monster.id}`} className="finalBossPhase3Effects">
+                {showDiveWarning && <i className="finalBossDiveWarning" style={{
+                  left: `${(impactAreaCol / COLS) * 100}%`,
+                  top: `${(impactAreaRow / ROWS) * 100}%`,
+                  width: `${(2 / COLS) * 100}%`,
+                  height: `${(2 / ROWS) * 100}%`,
+                }} />}
+                {showImpact && <i className="finalBossDiveImpact" style={{
+                  left: `${(impactAreaCol / COLS) * 100}%`,
+                  top: `${(impactAreaRow / ROWS) * 100}%`,
+                  width: `${(2 / COLS) * 100}%`,
+                  height: `${(2 / ROWS) * 100}%`,
+                }} />}
+                {(monster.finalBossPhase3Feathers ?? []).map((feather) => (
+                  <b key={feather.id} className="finalBossLightFeather" style={{
+                    left: `${((feather.col + .5) / COLS) * 100}%`,
+                    top: `${((feather.row + .5) / ROWS) * 100}%`,
+                    transform: `translate(-50%, -50%) rotate(${Math.atan2(feather.directionRow, feather.directionCol) * 180 / Math.PI + 90}deg)`,
+                  }} />
+                ))}
+              </span>
+            );
+          })}
+
+        {p.monsters
+          .filter((monster) =>
+            monster.isFinalBoss && (
+              (monster.finalBossSkillKind === "mana_burn" && monster.finalBossSkillEffectUntilMs !== undefined && now < monster.finalBossSkillEffectUntilMs) ||
+              (monster.finalBossPhase4ManaBurnUntilMs !== undefined && now < monster.finalBossPhase4ManaBurnUntilMs)
+            )
+          )
+          .map((monster) => {
+            const effectUntilMs = monster.finalBossPhase4ManaBurnUntilMs ?? monster.finalBossSkillEffectUntilMs;
+            const rowStart = monster.finalBossSkillAreaRowStart ?? 0;
+            const colStart = monster.finalBossSkillAreaColStart ?? 0;
+            return (
+              <span key={`final-boss-mana-burn-${monster.id}-${effectUntilMs}`} className="finalBossManaBurnField">
+                <i style={{
+                  left: `${(colStart / COLS) * 100}%`,
+                  top: `${(rowStart / ROWS) * 100}%`,
+                  width: `${(3 / COLS) * 100}%`,
+                  height: `${(2 / ROWS) * 100}%`,
+                }} />
+                <b style={{
+                  left: `${((colStart + 1.5) / COLS) * 100}%`,
+                  top: `${((rowStart + 1) / ROWS) * 100}%`,
+                  width: `${(3 / COLS) * 100}%`,
+                  height: `${(2 / ROWS) * 100}%`,
+                  animationDuration: `${3000 / p.animationSpeed}ms`,
+                }} />
+              </span>
+            );
+          })}
+
+        {p.monsters
+          .filter((monster) =>
+            monster.isFinalBoss && (monster.finalBossPhase === 2 || monster.finalBossPhase === 4) && (
+              (monster.finalBossPhase2ShotgunAtMs !== undefined && now < monster.finalBossPhase2ShotgunAtMs) ||
+              (monster.finalBossPhase2ShotgunEffectUntilMs !== undefined && now < monster.finalBossPhase2ShotgunEffectUntilMs)
+            )
+          )
+          .map((monster) => {
+            const position = getMonsterBoardPosition(monster);
+            const isWarning = monster.finalBossPhase2ShotgunAtMs !== undefined && now < monster.finalBossPhase2ShotgunAtMs;
+            return (
+              <span
+                key={`final-boss-glacier-${monster.id}-${monster.finalBossPhase2ShotgunAtMs ?? monster.finalBossPhase2ShotgunEffectUntilMs}`}
+                className={`finalBossGlacierField ${isWarning ? "warning" : "burst"}`}
+                style={{
+                  left: `${position.x}%`,
+                  top: `${position.y}%`,
+                  width: `${(3 / COLS) * 100}%`,
+                  height: `${(3 / ROWS) * 100}%`,
+                  animationPlayState: p.animationPaused ? "paused" : "running",
+                }}
+              ><i /><b />{!isWarning && <em style={{ backgroundImage: `url(${FINAL_BOSS_ICE_SHOTGUN_IMAGE})` }} />}</span>
+            );
+          })}
+
         {p.units
           .filter((unit) => unit.swordsmanWaveUntilMs !== undefined && now < unit.swordsmanWaveUntilMs)
           .map((unit) => {
@@ -1145,9 +1308,18 @@ export default function GameBoard(p: Props) {
           const isFinalBossPhase2 = m.isFinalBoss && m.finalBossPhase === 2;
           const isFinalBossPhase3 = m.isFinalBoss && m.finalBossPhase === 3;
           const isFinalBossPhase4 = m.isFinalBoss && m.finalBossPhase === 4;
+          const isFinalBossPhase2Shielded = isFinalBossPhase2 && (m.finalBossPhase2ShieldHp ?? 0) > 0;
+          const isFinalBossPhase2ShieldHit = isFinalBossPhase2Shielded && m.finalBossPhase2ShieldHitUntilMs !== undefined && now < m.finalBossPhase2ShieldHitUntilMs;
+          const isFinalBossPhase2ShieldBreaking = m.finalBossPhase2ShieldBreakUntilMs !== undefined && now < m.finalBossPhase2ShieldBreakUntilMs;
+          const isFinalBossPhase2Stunned = m.finalBossPhase2StunnedUntilMs !== undefined && now < m.finalBossPhase2StunnedUntilMs;
+          const isFinalBossPhase3Cleanse = m.finalBossPhase3CleanseEffectUntilMs !== undefined && now < m.finalBossPhase3CleanseEffectUntilMs;
+          const isFinalBossPhase3Immune = isFinalBossPhase3 && isFinalBossPhase3Cleanse;
           const usesFinalBossAura = isFinalBossPhase1 || isFinalBossPhase2 || isFinalBossPhase3 || isFinalBossPhase4;
           const stage20ShieldPercent = m.stage20ShieldMaxHp
             ? Math.max(0, ((m.stage20ShieldHp ?? 0) / m.stage20ShieldMaxHp) * 100)
+            : 0;
+          const finalBossPhase2ShieldPercent = m.finalBossPhase2ShieldMaxHp
+            ? Math.max(0, ((m.finalBossPhase2ShieldHp ?? 0) / m.finalBossPhase2ShieldMaxHp) * 100)
             : 0;
           const sniperSpecialTarget = p.projectiles.some((projectile) =>
             projectile.targetId === m.id &&
@@ -1288,6 +1460,12 @@ export default function GameBoard(p: Props) {
                   <i /><i /><i />
                 </span>
               )}
+              {isFinalBossPhase2Shielded && <span className="finalBossIceArmor" aria-hidden="true" />}
+              {isFinalBossPhase2ShieldHit && <span className="finalBossIceArmorHit" aria-hidden="true" />}
+              {isFinalBossPhase2ShieldBreaking && <span className="finalBossIceArmorBreak" aria-hidden="true" />}
+              {isFinalBossPhase2Stunned && <span className="finalBossIceArmorStun" aria-hidden="true"><i /><i /><i /></span>}
+              {isFinalBossPhase3Cleanse && <span className="finalBossRadiantMolt" aria-label="광휘의 탈피"><i /><b /></span>}
+              {isFinalBossPhase3Immune && <span className="finalBossStatusImmunity" aria-label="상태이상 면역 및 방어력 증가"><i>IMMUNE · DEF +50%</i></span>}
               {isStage25Casting && (
                 <span
                   className="stage25ReforgeEffect"
@@ -1383,7 +1561,7 @@ export default function GameBoard(p: Props) {
                                 ? 1400
                             : 480
                   ) / p.animationSpeed}ms`,
-                  animationPlayState: p.animationPaused || isStage10Stomping || isStage20Charging || isStage20Stunned || isStage25Casting ? "paused" : "running",
+                  animationPlayState: p.animationPaused || isStage10Stomping || isStage20Charging || isStage20Stunned || isStage25Casting || isFinalBossPhase2Stunned ? "paused" : "running",
                 }}
                 aria-hidden="true"
               />
@@ -1410,6 +1588,14 @@ export default function GameBoard(p: Props) {
                   <span className="stage20ShieldSegments" aria-hidden="true" />
                   <span className="stage20ShieldBarText">
                     {Math.ceil(m.stage20ShieldHp ?? 0)}/{m.stage20ShieldMaxHp}
+                  </span>
+                </span>
+              )}
+              {isFinalBossPhase2Shielded && m.finalBossPhase2ShieldMaxHp !== undefined && (
+                <span className="finalBossIceArmorBar">
+                  <span className="finalBossIceArmorBarFill" style={{ width: `${finalBossPhase2ShieldPercent}%` }} />
+                  <span className="finalBossIceArmorBarText">
+                    빙결 갑주 {Math.ceil(m.finalBossPhase2ShieldHp ?? 0)}/{m.finalBossPhase2ShieldMaxHp}
                   </span>
                 </span>
               )}

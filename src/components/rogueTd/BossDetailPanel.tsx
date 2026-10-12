@@ -71,6 +71,7 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
     1,
     Math.round(boss.hp * STAGE20_SHIELD_RATIO),
   );
+  const finalBossPhase2ShieldMaxHp = boss.finalBossPhase2ShieldMaxHp ?? Math.max(1, Math.round(boss.maxHp * 0.2));
   const isStage10Stomping =
     boss.stage10StompImpactAtMs !== undefined &&
     gameNowMs < boss.stage10StompImpactAtMs;
@@ -83,7 +84,11 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
     : hpPercent < 50
       ? "bossHpWarning"
       : "bossHpHealthy";
-  const state = isStage20
+  const state = isFinalBoss
+    ? boss.finalBossMode !== "combat"
+      ? "빛 흡수·형태 전환 중"
+      : `${boss.finalBossPhase ?? 1}페이즈 전투 중`
+    : isStage20
     ? boss.stage20State === "charging"
       ? (boss.stage20ShieldHp ?? 0) > 0 ? "보호막 재충전 중" : "보호막 생성 중"
       : boss.stage20State === "shielded"
@@ -120,7 +125,21 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
         : boss.stage05ShieldActive
           ? "소환 보호막 · 무적"
           : "이동 중";
-  const timerLabel = isStage20
+  const timerLabel = isFinalBoss
+    ? boss.finalBossPhase === 1 && boss.finalBossNextSkillAtMs !== undefined
+      ? `다음 찬탈까지 ${formatSeconds(boss.finalBossNextSkillAtMs - gameNowMs)}`
+      : boss.finalBossPhase === 2 && (boss.finalBossPhase2ShieldHp ?? 0) > 0 && boss.finalBossPhase2ShieldEndsAtMs !== undefined
+        ? `갑주 폭발까지 ${formatSeconds(boss.finalBossPhase2ShieldEndsAtMs - gameNowMs)}`
+        : boss.finalBossPhase === 2 && boss.finalBossPhase2NextShieldAtMs !== undefined
+          ? `다음 빙결 갑주까지 ${formatSeconds(boss.finalBossPhase2NextShieldAtMs - gameNowMs)}`
+          : boss.finalBossPhase === 2 && boss.finalBossPhase2StunnedUntilMs !== undefined && gameNowMs < boss.finalBossPhase2StunnedUntilMs
+            ? `정지 해제까지 ${formatSeconds(boss.finalBossPhase2StunnedUntilMs - gameNowMs)}`
+          : boss.finalBossPhase === 3 && boss.finalBossPhase3DiveImpactAtMs !== undefined
+            ? `급강하까지 ${formatSeconds(boss.finalBossPhase3DiveImpactAtMs - gameNowMs)}`
+          : boss.finalBossPhase === 3 && boss.finalBossPhase3NextDiveAtMs !== undefined
+            ? `다음 급강하까지 ${formatSeconds(boss.finalBossPhase3NextDiveAtMs - gameNowMs)}`
+      : "발동 대기"
+    : isStage20
     ? boss.stage20State === "charging" && boss.stage20CastEndsAtMs !== undefined
       ? `전개까지 ${formatSeconds(boss.stage20CastEndsAtMs - gameNowMs)}`
       : boss.stage20State === "shielded" && boss.stage20NextShieldAtMs !== undefined
@@ -248,14 +267,23 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
           {isStage20 && (
             <div><dt>보호막</dt><dd className="bossShieldValue">{Math.ceil(boss.stage20ShieldHp ?? 0).toLocaleString()} / {stage20ShieldMaxHp.toLocaleString()}</dd></div>
           )}
+          {isFinalBoss && boss.finalBossPhase === 2 && (
+            <div><dt>빙결 갑주</dt><dd className="bossShieldValue">{Math.ceil(boss.finalBossPhase2ShieldHp ?? 0).toLocaleString()} / {finalBossPhase2ShieldMaxHp.toLocaleString()}</dd></div>
+          )}
           {isStage30 && (
             <div><dt>부유석</dt><dd className="bossShieldValue">{boss.stage30StoneCount ?? 0}/4 · {Math.ceil(boss.stage30StoneHp ?? 0).toLocaleString()} / {(boss.stage30StoneMaxHp ?? 0).toLocaleString()}</dd></div>
           )}
-          {(isStage05 || isStage10 || isStage15 || isStage20 || isStage25 || isStage30) && <div><dt>스킬 시간</dt><dd>{timerLabel}</dd></div>}
+          {(isFinalBoss || isStage05 || isStage10 || isStage15 || isStage20 || isStage25 || isStage30) && <div><dt>스킬 시간</dt><dd>{timerLabel}</dd></div>}
         </dl>
 
         <div className="unitSpecialEffect bossSkillDescription">
-          <strong>{isStage05
+          <strong>{isFinalBoss && boss.finalBossPhase === 1
+            ? "스킬 · 찬탈한 무예"
+            : isFinalBoss && boss.finalBossPhase === 2
+              ? "스킬 · 빙결 갑주 / 산탄 빙하"
+            : isFinalBoss && boss.finalBossPhase === 3
+              ? "스킬 · 급강하 / 깃털 탄막 / 광휘의 탈피"
+            : isStage05
             ? "스킬 · 망자의 부름"
             : isStage10
               ? "스킬 · 대지 강타"
@@ -268,7 +296,13 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
                     : isStage30
                       ? "스킬 · 궤도 방위체계 / 자력 도약"
               : "스킬"}</strong>
-          <p>{isStage05
+          <p>{isFinalBoss && boss.finalBossPhase === 1
+            ? "5초마다 공간참, 마력 연소, 제압 사격 중 하나를 무작위로 사용한다. 공간참은 가까운 유닛 방향의 직선 3칸 또는 대각선 2칸을 베어 5초간 기절시킨다. 마력 연소는 가까운 유닛 중심 3×2 영역의 액티브·패시브 스킬을 5초간 봉인하고 스킬 쿨타임을 최대치로 초기화한다. 연소가 끝난 뒤 전체 쿨타임이 다시 흐른다. 제압 사격은 누적 피해량 상위 유닛 3기의 기본 공격을 5초간 봉인한다. 같은 기술에 연속으로 적중하면 지속시간이 갱신된다. 최종 보스전에서는 합체 필살기를 사용할 수 없다."
+            : isFinalBoss && boss.finalBossPhase === 2
+              ? "페이즈 시작 5초 후 최대 체력의 20%인 빙결 갑주를 10초간 전개한다. 성공과 실패 모두 갑주 종료 1초 후 얼음 산탄을 발사하며, 산탄 발사 5초 후 다시 갑주를 사용한다. 파괴하지 못하면 남은 보호막만큼 체력을 회복한다. 파괴하면 산탄 발사까지 1초간 정지한다. 산탄과 5초마다 붉게 예고된 무작위 아군 3기 위로 떨어지는 빙결 표식은 빙결 스택을 1 부여한다. 스택마다 공격속도가 20% 감소하며, 5초간 새 스택이 쌓이지 않으면 1스택 감소한다. 3스택이 되면 스택을 소모하고 5초간 빙결되어 아무 행동도 할 수 없다."
+            : isFinalBoss && boss.finalBossPhase === 3
+              ? "0.5초 준비 후 무작위 아군과 가장 가까운 길로 급강하한다. 착지 지점의 2×2 영역에 있는 아군을 5초간 기절시키고 상하좌우와 대각선으로 빛의 깃털 8개를 즉시 발사한다. 착지 0.5초 후부터 보스는 다시 이동한다. 깃털은 무작위 8방향으로 꺾이며 최대 3칸 이동하고, 접촉한 아군의 공격력을 5초간 20% 감소시킨다. 8초마다 광휘의 탈피를 사용해 모든 디버프를 해제하고 5초간 상태이상과 표식에 면역이 되며 받는 피해가 50% 감소한다."
+            : isStage05
             ? "등장 8초 후 스켈레톤 5마리를 소환한다. 소환수가 존재하는 동안 무적이 되며, 15초 안에 처치하지 못하면 남은 스켈레톤의 체력을 흡수해 회복한다."
             : isStage10
               ? "이동을 멈추고 주변 3칸에 강력한 충격파를 일으킨다. 범위 안의 유닛은 3초 동안 기절해 공격할 수 없다."

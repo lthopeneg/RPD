@@ -120,7 +120,7 @@ export const getBossCategory = (wave: number): MonsterCategory => {
 export const ENEMY_HP_MULTIPLIER = 1.1;
 export const FINAL_BOSS_PHASE_HP = 20000;
 export const getBossHp = (wave: number) => {
-  if (isFinalStage(wave)) return Math.round(FINAL_BOSS_PHASE_HP * 4 * ENEMY_HP_MULTIPLIER);
+  if (isFinalStage(wave)) return FINAL_BOSS_PHASE_HP * 4;
   const baseHp = BOSS_HP * 3 * 1.75 ** (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1);
   return Math.round(baseHp * (wave === 20 ? 0.75 : 1) * ENEMY_HP_MULTIPLIER);
 };
