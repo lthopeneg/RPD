@@ -2497,6 +2497,7 @@ export default function RogueTdPage() {
           phaseTwoBoss.finalBossPhase2NextMarkAtMs = gameNow + FINAL_BOSS_PHASE2_MARK_INTERVAL_MS;
         } else if (
           usesPhaseTwoAutomaticCycle &&
+          phaseTwoBoss.finalBossPhase2NextMarkAtMs !== undefined &&
           gameNow >= phaseTwoBoss.finalBossPhase2NextMarkAtMs &&
           phaseTwoBoss.finalBossPhase2MarkImpactAtMs === undefined &&
           unitsRef.current.length > 0
@@ -2504,7 +2505,7 @@ export default function RogueTdPage() {
           const targets = [...unitsRef.current].sort(() => Math.random() - 0.5).slice(0, 3);
           phaseTwoBoss.finalBossPhase2MarkTargetIds = targets.map((unit) => unit.id);
           phaseTwoBoss.finalBossPhase2MarkImpactAtMs = gameNow + FINAL_BOSS_PHASE2_MARK_WARNING_MS;
-          phaseTwoBoss.finalBossPhase2NextMarkAtMs += FINAL_BOSS_PHASE2_MARK_INTERVAL_MS;
+          phaseTwoBoss.finalBossPhase2NextMarkAtMs = gameNow + FINAL_BOSS_PHASE2_MARK_INTERVAL_MS;
           setStatus(`⚠️ 빙결 표식! 무작위 아군 ${targets.length}기의 위치에 얼음 덩어리가 낙하합니다.`);
         }
         if (
@@ -2546,7 +2547,11 @@ export default function RogueTdPage() {
         const usesPhaseThreeAutomaticCycle = phaseThreeBoss.finalBossPhase === 3;
         if (usesPhaseThreeAutomaticCycle && phaseThreeBoss.finalBossPhase3NextCleanseAtMs === undefined) {
           phaseThreeBoss.finalBossPhase3NextCleanseAtMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_COOLDOWN_MS;
-        } else if (usesPhaseThreeAutomaticCycle && gameNow >= phaseThreeBoss.finalBossPhase3NextCleanseAtMs) {
+        } else if (
+          usesPhaseThreeAutomaticCycle &&
+          phaseThreeBoss.finalBossPhase3NextCleanseAtMs !== undefined &&
+          gameNow >= phaseThreeBoss.finalBossPhase3NextCleanseAtMs
+        ) {
           phaseThreeBoss.slowUntilMs = undefined;
           phaseThreeBoss.paralyzeUntilMs = undefined;
           phaseThreeBoss.bleedUntilMs = undefined;
@@ -2557,7 +2562,7 @@ export default function RogueTdPage() {
           phaseThreeBoss.burnEffectUntilMs = undefined;
           phaseThreeBoss.statusImmunityUntilMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_IMMUNITY_MS;
           phaseThreeBoss.finalBossPhase3CleanseEffectUntilMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_IMMUNITY_MS;
-          phaseThreeBoss.finalBossPhase3NextCleanseAtMs += FINAL_BOSS_PHASE3_CLEANSE_COOLDOWN_MS;
+          phaseThreeBoss.finalBossPhase3NextCleanseAtMs = gameNow + FINAL_BOSS_PHASE3_CLEANSE_COOLDOWN_MS;
           setStatus("🪽 광휘의 탈피! 모든 약화 효과를 해제하고 5초간 상태이상에 면역이 됩니다.");
           addLog("최종 보스가 광휘의 탈피로 모든 디버프를 제거했습니다.");
         }
@@ -2566,6 +2571,7 @@ export default function RogueTdPage() {
           phaseThreeBoss.finalBossPhase3NextDiveAtMs = gameNow + FINAL_BOSS_PHASE3_FIRST_DIVE_DELAY_MS;
         } else if (
           usesPhaseThreeAutomaticCycle &&
+          phaseThreeBoss.finalBossPhase3NextDiveAtMs !== undefined &&
           gameNow >= phaseThreeBoss.finalBossPhase3NextDiveAtMs &&
           phaseThreeBoss.finalBossPhase3DiveImpactAtMs === undefined &&
           unitsRef.current.length > 0

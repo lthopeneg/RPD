@@ -615,7 +615,7 @@ export default function GameBoard(p: Props) {
           })}
 
         {p.monsters
-          .filter((monster) => monster.isFinalBoss && monster.finalBossPhase === 3)
+          .filter((monster) => monster.isFinalBoss && (monster.finalBossPhase === 3 || monster.finalBossPhase === 4))
           .map((monster) => {
             const targetCell = monster.finalBossPhase3DiveTargetCell;
             const targetRow = targetCell === undefined ? 0 : Math.floor(targetCell / COLS);
@@ -1308,12 +1308,12 @@ export default function GameBoard(p: Props) {
           const isFinalBossPhase2 = m.isFinalBoss && m.finalBossPhase === 2;
           const isFinalBossPhase3 = m.isFinalBoss && m.finalBossPhase === 3;
           const isFinalBossPhase4 = m.isFinalBoss && m.finalBossPhase === 4;
-          const isFinalBossPhase2Shielded = isFinalBossPhase2 && (m.finalBossPhase2ShieldHp ?? 0) > 0;
+          const isFinalBossPhase2Shielded = (isFinalBossPhase2 || isFinalBossPhase4) && (m.finalBossPhase2ShieldHp ?? 0) > 0;
           const isFinalBossPhase2ShieldHit = isFinalBossPhase2Shielded && m.finalBossPhase2ShieldHitUntilMs !== undefined && now < m.finalBossPhase2ShieldHitUntilMs;
           const isFinalBossPhase2ShieldBreaking = m.finalBossPhase2ShieldBreakUntilMs !== undefined && now < m.finalBossPhase2ShieldBreakUntilMs;
           const isFinalBossPhase2Stunned = m.finalBossPhase2StunnedUntilMs !== undefined && now < m.finalBossPhase2StunnedUntilMs;
           const isFinalBossPhase3Cleanse = m.finalBossPhase3CleanseEffectUntilMs !== undefined && now < m.finalBossPhase3CleanseEffectUntilMs;
-          const isFinalBossPhase3Immune = isFinalBossPhase3 && isFinalBossPhase3Cleanse;
+          const isFinalBossPhase3Immune = (isFinalBossPhase3 || isFinalBossPhase4) && isFinalBossPhase3Cleanse;
           const usesFinalBossAura = isFinalBossPhase1 || isFinalBossPhase2 || isFinalBossPhase3 || isFinalBossPhase4;
           const stage20ShieldPercent = m.stage20ShieldMaxHp
             ? Math.max(0, ((m.stage20ShieldHp ?? 0) / m.stage20ShieldMaxHp) * 100)

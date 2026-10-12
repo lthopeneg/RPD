@@ -138,6 +138,8 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
             ? `급강하까지 ${formatSeconds(boss.finalBossPhase3DiveImpactAtMs - gameNowMs)}`
           : boss.finalBossPhase === 3 && boss.finalBossPhase3NextDiveAtMs !== undefined
             ? `다음 급강하까지 ${formatSeconds(boss.finalBossPhase3NextDiveAtMs - gameNowMs)}`
+          : boss.finalBossPhase === 4 && boss.finalBossPhase4NextComboAtMs !== undefined
+            ? `다음 권능 폭주까지 ${formatSeconds(boss.finalBossPhase4NextComboAtMs - gameNowMs)}`
       : "발동 대기"
     : isStage20
     ? boss.stage20State === "charging" && boss.stage20CastEndsAtMs !== undefined
@@ -267,7 +269,7 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
           {isStage20 && (
             <div><dt>보호막</dt><dd className="bossShieldValue">{Math.ceil(boss.stage20ShieldHp ?? 0).toLocaleString()} / {stage20ShieldMaxHp.toLocaleString()}</dd></div>
           )}
-          {isFinalBoss && boss.finalBossPhase === 2 && (
+          {isFinalBoss && (boss.finalBossPhase === 2 || boss.finalBossPhase === 4) && (boss.finalBossPhase2ShieldMaxHp ?? 0) > 0 && (
             <div><dt>빙결 갑주</dt><dd className="bossShieldValue">{Math.ceil(boss.finalBossPhase2ShieldHp ?? 0).toLocaleString()} / {finalBossPhase2ShieldMaxHp.toLocaleString()}</dd></div>
           )}
           {isStage30 && (
@@ -283,6 +285,8 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
               ? "스킬 · 빙결 갑주 / 산탄 빙하"
             : isFinalBoss && boss.finalBossPhase === 3
               ? "스킬 · 급강하 / 깃털 탄막 / 광휘의 탈피"
+            : isFinalBoss && boss.finalBossPhase === 4
+              ? "스킬 · 권능 폭주"
             : isStage05
             ? "스킬 · 망자의 부름"
             : isStage10
@@ -302,6 +306,8 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
               ? "페이즈 시작 5초 후 최대 체력의 20%인 빙결 갑주를 10초간 전개한다. 성공과 실패 모두 갑주 종료 1초 후 얼음 산탄을 발사하며, 산탄 발사 5초 후 다시 갑주를 사용한다. 파괴하지 못하면 남은 보호막만큼 체력을 회복한다. 파괴하면 산탄 발사까지 1초간 정지한다. 산탄과 5초마다 붉게 예고된 무작위 아군 3기 위로 떨어지는 빙결 표식은 빙결 스택을 1 부여한다. 스택마다 공격속도가 20% 감소하며, 5초간 새 스택이 쌓이지 않으면 1스택 감소한다. 3스택이 되면 스택을 소모하고 5초간 빙결되어 아무 행동도 할 수 없다."
             : isFinalBoss && boss.finalBossPhase === 3
               ? "0.5초 준비 후 무작위 아군과 가장 가까운 길로 급강하한다. 착지 지점의 2×2 영역에 있는 아군을 5초간 기절시키고 상하좌우와 대각선으로 빛의 깃털 8개를 즉시 발사한다. 착지 0.5초 후부터 보스는 다시 이동한다. 깃털은 무작위 8방향으로 꺾이며 최대 3칸 이동하고, 접촉한 아군의 공격력을 5초간 20% 감소시킨다. 8초마다 광휘의 탈피를 사용해 모든 디버프를 해제하고 5초간 상태이상과 표식에 면역이 되며 받는 피해가 50% 감소한다."
+            : isFinalBoss && boss.finalBossPhase === 4
+              ? "6초마다 공간참, 마력 연소, 제압 사격, 빙결 갑주, 빙결 표식, 급강하·깃털 탄막, 광휘의 탈피 중 서로 다른 3개의 권능을 무작위로 동시에 사용한다. 이미 진행 중인 빙결 갑주와 급강하는 다시 선택하지 않으며, 예약된 산탄과 착지 공격은 다른 권능과 함께 계속 진행된다."
             : isStage05
             ? "등장 8초 후 스켈레톤 5마리를 소환한다. 소환수가 존재하는 동안 무적이 되며, 15초 안에 처치하지 못하면 남은 스켈레톤의 체력을 흡수해 회복한다."
             : isStage10
