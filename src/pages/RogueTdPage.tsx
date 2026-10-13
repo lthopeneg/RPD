@@ -13,6 +13,8 @@ import type { WaveDamageEntry } from "../components/rogueTd/DamageReport";
 import ContextActionMenu from "../components/rogueTd/ContextActionMenu";
 import DebugPanel from "../components/rogueTd/DebugPanel";
 import UltimateCutIn from "../components/rogueTd/UltimateCutIn";
+import TutorialPanel from "../components/rogueTd/TutorialPanel";
+import CodexPanel from "../components/rogueTd/CodexPanel";
 import type { DebugBrush, DebugMonsterEntry, DebugStagePreset } from "../components/rogueTd/DebugPanel";
 import { generateMap } from "../games/rogueTd/mapGenerator";
 import { findShortestPath, toRC } from "../games/rogueTd/pathfinding";
@@ -322,6 +324,11 @@ export default function RogueTdPage() {
   const [debugCodePromptOpen, setDebugCodePromptOpen] = useState(false);
   const [debugCodeInput, setDebugCodeInput] = useState("");
   const [debugCodeError, setDebugCodeError] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialAttention, setTutorialAttention] = useState(true);
+  const tutorialPausedGame = useRef(false);
+  const [codexOpen, setCodexOpen] = useState(false);
+  const codexPausedGame = useRef(false);
   const [gameResult, setGameResult] = useState<"playing" | "won" | "lost">(
     "playing",
   );
@@ -383,6 +390,31 @@ export default function RogueTdPage() {
     mage: Number.POSITIVE_INFINITY,
     ranger: Number.POSITIVE_INFINITY,
   });
+
+  const openTutorial = useCallback(() => {
+    setTutorialAttention(false);
+    tutorialPausedGame.current = running && !paused;
+    if (tutorialPausedGame.current) setPaused(true);
+    setTutorialOpen(true);
+  }, [paused, running]);
+
+  const closeTutorial = useCallback(() => {
+    setTutorialOpen(false);
+    if (tutorialPausedGame.current) setPaused(false);
+    tutorialPausedGame.current = false;
+  }, []);
+
+  const openCodex = useCallback(() => {
+    codexPausedGame.current = running && !paused;
+    if (codexPausedGame.current) setPaused(true);
+    setCodexOpen(true);
+  }, [paused, running]);
+
+  const closeCodex = useCallback(() => {
+    setCodexOpen(false);
+    if (codexPausedGame.current) setPaused(false);
+    codexPausedGame.current = false;
+  }, []);
 
   const enqueueUltimate = useCallback((job: UltimateJob) => {
     if (ultimateActiveRef.current) {
@@ -2239,22 +2271,19 @@ export default function RogueTdPage() {
         if (phaseFourBoss.finalBossPhase4NextComboAtMs === undefined) {
           phaseFourBoss.finalBossPhase4NextComboAtMs = gameNow + FINAL_BOSS_PHASE4_COMBO_INTERVAL_MS;
         } else if (gameNow >= phaseFourBoss.finalBossPhase4NextComboAtMs && unitsRef.current.length > 0) {
-          type PhaseFourSkill = "space_slash" | "mana_burn" | "suppressive_fire" | "ice_armor" | "freeze_mark" | "sky_dive" | "radiant_molt";
+          type PhaseFourSkill = "space_slash" | "mana_burn" | "suppressive_fire" | "ice_shotgun" | "freeze_mark" | "sky_dive" | "radiant_molt";
           const skillNames: Record<PhaseFourSkill, string> = {
             space_slash: "공간참",
             mana_burn: "마력 연소",
             suppressive_fire: "제압 사격",
-            ice_armor: "빙결 갑주",
+            ice_shotgun: "얼음 산탄",
             freeze_mark: "빙결 표식",
             sky_dive: "급강하",
             radiant_molt: "광휘의 탈피",
           };
           const candidates: PhaseFourSkill[] = [
-            "space_slash", "mana_burn", "suppressive_fire", "freeze_mark", "radiant_molt",
+            "space_slash", "mana_burn", "suppressive_fire", "ice_shotgun", "freeze_mark", "radiant_molt",
           ];
-          if ((phaseFourBoss.finalBossPhase2ShieldHp ?? 0) <= 0 && phaseFourBoss.finalBossPhase2ShotgunAtMs === undefined) {
-            candidates.push("ice_armor");
-          }
           if (phaseFourBoss.finalBossPhase3DiveImpactAtMs === undefined) candidates.push("sky_dive");
           const selectedSkills = [...candidates].sort(() => Math.random() - 0.5).slice(0, 3);
           phaseFourBoss.finalBossPhase4NextComboAtMs = gameNow + FINAL_BOSS_PHASE4_COMBO_INTERVAL_MS;
@@ -2323,13 +2352,8 @@ export default function RogueTdPage() {
                 .forEach((unit) => {
                   unit.basicAttackSealUntilMs = Math.max(unit.basicAttackSealUntilMs ?? 0, gameNow + FINAL_BOSS_SUPPRESSIVE_FIRE_MS);
                 });
-            } else if (skill === "ice_armor") {
-              const shieldMaxHp = Math.max(1, Math.round(phaseFourBoss.maxHp * FINAL_BOSS_PHASE2_SHIELD_RATIO));
-              phaseFourBoss.finalBossPhase2ShieldUsed = true;
-              phaseFourBoss.finalBossPhase2ShieldMaxHp = shieldMaxHp;
-              phaseFourBoss.finalBossPhase2ShieldHp = shieldMaxHp;
-              phaseFourBoss.finalBossPhase2ShieldEndsAtMs = gameNow + FINAL_BOSS_PHASE2_SHIELD_DURATION_MS;
-              phaseFourBoss.finalBossPhase2NextShieldAtMs = undefined;
+            } else if (skill === "ice_shotgun") {
+              fireFinalBossPhase2Shotgun(phaseFourBoss);
             } else if (skill === "freeze_mark") {
               const targets = [...unitsRef.current].sort(() => Math.random() - 0.5).slice(0, 3);
               phaseFourBoss.finalBossPhase2MarkTargetIds = targets.map((unit) => unit.id);
@@ -4386,6 +4410,8 @@ export default function RogueTdPage() {
           onClose={() => { setDebugMode(false); setDebugBrush(null); }}
         />
       )}
+      {tutorialOpen && <TutorialPanel onClose={closeTutorial} />}
+      {codexOpen && <CodexPanel onClose={closeCodex} />}
       <div className="gameLayout">
         <aside className="leftRail">
           <section className="brandPanel panelBox">
@@ -4503,6 +4529,23 @@ export default function RogueTdPage() {
 
         <aside className="rightRail">
           <DamageReport wave={damageReportWave} entries={waveDamageReport} />
+          <div className="rightRailTutorialSlot">
+            <button
+              type="button"
+              className={`tutorialLauncher ${tutorialAttention ? "attention" : ""}`}
+              onMouseEnter={() => setTutorialAttention(false)}
+              onFocus={() => setTutorialAttention(false)}
+              onClick={openTutorial}
+              aria-label="게임 튜토리얼 열기"
+            >
+              <span aria-hidden="true">?</span>
+              <strong>튜토리얼</strong>
+              <small>처음이라면 여기를 확인하세요</small>
+            </button>
+            <button type="button" className="codexLauncher" onClick={openCodex} aria-label="게임 도감 열기">
+              <span aria-hidden="true">📖</span><strong>도감</strong><small>유닛과 적 정보</small>
+            </button>
+          </div>
           <section className="playerResourcePanel panelBox">
             <div className="playerLevelRow">
               <strong>LV. {playerLevel}</strong>
@@ -4537,6 +4580,7 @@ export default function RogueTdPage() {
             onNewMap={resetMap}
             debugMode={debugMode}
             finalStage={isFinalStage(wave)}
+            interactionBlocked={tutorialOpen || codexOpen}
             onToggleDebug={handleToggleDebug}
           />
         </aside>

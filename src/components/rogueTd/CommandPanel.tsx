@@ -26,6 +26,7 @@ interface Props {
   onNewMap: () => void;
   debugMode: boolean;
   finalStage: boolean;
+  interactionBlocked?: boolean;
   onToggleDebug: () => void;
 }
 
@@ -67,7 +68,7 @@ export default function CommandPanel(props: Props) {
     const handleShortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (
-        event.repeat || event.ctrlKey || event.altKey || event.metaKey || confirmNewGame ||
+        event.repeat || event.ctrlKey || event.altKey || event.metaKey || confirmNewGame || props.interactionBlocked ||
         target?.matches("input, textarea, select, [contenteditable='true']")
       ) return;
 
@@ -92,7 +93,7 @@ export default function CommandPanel(props: Props) {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [
     buyUnitDisabled, buyUpgradeDisabled, buyXpDisabled, confirmNewGame,
-    props.gameEnded, props.onBuyUnit, props.onBuyUpgrade, props.onBuyXp,
+    props.gameEnded, props.interactionBlocked, props.onBuyUnit, props.onBuyUpgrade, props.onBuyXp,
     props.onStartWave, props.onTogglePath, props.onTogglePause,
     props.onToggleSpeed, props.onToggleDebug, props.running,
   ]);
