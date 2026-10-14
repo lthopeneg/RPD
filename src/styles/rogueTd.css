@@ -4613,10 +4613,11 @@ body {
   box-shadow: 0 0 7px rgba(255, 255, 255, 0.32);
 }
 .bossStateActive { color: #c4b5fd !important; font-weight: 900; }
-.bossSkillDescription > strong { color: #c4b5fd; }
-.bossSkillIconList { margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 7px; }
-.bossSkillIconEntry { min-width: 52px; display: grid; justify-items: center; gap: 3px; color: #cbd5e1; font-size: 8px; }
-.bossSkillIconEntry img { width: 44px; height: 44px; object-fit: contain; border: 1px solid #4b5563; border-radius: 6px; background: #090d14; }
+.bossLightDrainValue, .codexLightDrainValue { color: #f9a8d4 !important; font-weight: 900; }
+.bossTierSkill > strong { color: #c4b5fd; }
+.bossSkillIconList { margin: 0; flex-wrap: wrap; }
+.bossSkillIcon { width: 52px; height: 52px; flex-basis: 52px; border-color: #75618f; box-shadow: inset 0 0 8px rgba(0,0,0,.8), 0 0 6px rgba(196,181,253,.24); }
+.bossSkillTooltip { width: 270px; border-color: #75618f; }
 
 .resourceBar { min-height: 42px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-around; gap: 8px; font-size: 11px; }
 .resourceBar b { color: #fff; }

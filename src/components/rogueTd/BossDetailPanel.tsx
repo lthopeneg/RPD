@@ -1,6 +1,6 @@
 import type { Monster, MonsterCategory } from "../../games/rogueTd/types";
 import { STAGE20_SHIELD_RATIO } from "../../games/rogueTd/constants";
-import { getBossSkills } from "../../games/rogueTd/bossSkillInfo";
+import { FINAL_BOSS_LIGHT_DRAIN, getBossSkills } from "../../games/rogueTd/bossSkillInfo";
 
 interface Props {
   boss: Monster;
@@ -268,6 +268,9 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
           </div>
           <div><dt>이동속도</dt><dd>{boss.speedTilesPerSecond.toFixed(2)}칸/초</dd></div>
           <div><dt>현재 상태</dt><dd className={boss.stage05ShieldActive ? "bossStateActive" : ""}>{state}</dd></div>
+          {isFinalBoss && (
+            <div><dt>빛 흡수</dt><dd className="bossLightDrainValue">{FINAL_BOSS_LIGHT_DRAIN[boss.finalBossPhase ?? 1]}</dd></div>
+          )}
           {isStage20 && (
             <div><dt>보호막</dt><dd className="bossShieldValue">{Math.ceil(boss.stage20ShieldHp ?? 0).toLocaleString()} / {stage20ShieldMaxHp.toLocaleString()}</dd></div>
           )}
@@ -280,57 +283,24 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
           {(isFinalBoss || isStage05 || isStage10 || isStage15 || isStage20 || isStage25 || isStage30) && <div><dt>스킬 시간</dt><dd>{timerLabel}</dd></div>}
         </dl>
 
-        <div className="unitSpecialEffect bossSkillDescription">
-          <div className="bossSkillIconList" aria-label="보스 스킬 아이콘">
+        <div className="unitTierSkill bossTierSkill">
+          <strong>스킬</strong>
+          <div className="unitSkillIconRow bossSkillIconList" aria-label="보스 스킬">
             {detailSkills.map((skill) => (
-              <div className="bossSkillIconEntry" key={skill.name} title={skill.name}>
-                <img src={skill.icon} alt="" />
-                <span>{skill.name}</span>
-              </div>
+              <span
+                className="unitSkillIcon bossSkillIcon"
+                key={skill.name}
+                tabIndex={0}
+                aria-label={`${skill.name}: ${skill.description}`}
+              >
+                <img src={skill.icon} alt={skill.name} />
+                <span className="unitSkillTooltip bossSkillTooltip" role="tooltip">
+                  <b>{skill.name}</b>
+                  <em>{skill.description}</em>
+                </span>
+              </span>
             ))}
           </div>
-          <strong>{isFinalBoss && boss.finalBossPhase === 1
-            ? "스킬 · 찬탈한 무예"
-            : isFinalBoss && boss.finalBossPhase === 2
-              ? "스킬 · 빙결 갑주 / 산탄 빙하"
-            : isFinalBoss && boss.finalBossPhase === 3
-              ? "스킬 · 급강하 / 깃털 탄막 / 광휘의 탈피"
-            : isFinalBoss && boss.finalBossPhase === 4
-              ? "스킬 · 권능 폭주"
-            : isStage05
-            ? "스킬 · 망자의 부름"
-            : isStage10
-              ? "스킬 · 대지 강타"
-              : isStage15
-                ? "스킬 · 영겁의 환생"
-                : isStage20
-                  ? "스킬 · 성채의 맹세"
-                  : isStage25
-                    ? "스킬 · 대지의 재편"
-                    : isStage30
-                      ? "스킬 · 궤도 방위체계 / 자력 도약"
-              : "스킬"}</strong>
-          <p>{isFinalBoss && boss.finalBossPhase === 1
-            ? "5초마다 공간참, 마력 연소, 제압 사격 중 하나를 무작위로 사용한다. 공간참은 가까운 유닛 방향의 직선 3칸 또는 대각선 2칸을 베어 5초간 기절시킨다. 마력 연소는 가까운 유닛 중심 3×2 영역의 액티브·패시브 스킬을 5초간 봉인하고 스킬 쿨타임을 최대치로 초기화한다. 연소가 끝난 뒤 전체 쿨타임이 다시 흐른다. 제압 사격은 누적 피해량 상위 유닛 3기의 기본 공격을 5초간 봉인한다. 같은 기술에 연속으로 적중하면 지속시간이 갱신된다. 최종 보스전에서는 합체 필살기를 사용할 수 없다."
-            : isFinalBoss && boss.finalBossPhase === 2
-              ? "페이즈 시작 5초 후 최대 체력의 20%인 빙결 갑주를 10초간 전개한다. 성공과 실패 모두 갑주 종료 1초 후 얼음 산탄을 발사하며, 산탄 발사 5초 후 다시 갑주를 사용한다. 파괴하지 못하면 남은 보호막만큼 체력을 회복한다. 파괴하면 산탄 발사까지 1초간 정지한다. 산탄과 5초마다 붉게 예고된 무작위 아군 3기 위로 떨어지는 빙결 표식은 빙결 스택을 1 부여한다. 스택마다 공격속도가 20% 감소하며, 5초간 새 스택이 쌓이지 않으면 1스택 감소한다. 3스택이 되면 스택을 소모하고 5초간 빙결되어 아무 행동도 할 수 없다."
-            : isFinalBoss && boss.finalBossPhase === 3
-              ? "0.5초 준비 후 무작위 아군과 가장 가까운 길로 급강하한다. 착지 지점의 2×2 영역에 있는 아군을 5초간 기절시키고 상하좌우와 대각선으로 빛의 깃털 8개를 즉시 발사한다. 착지 0.5초 후부터 보스는 다시 이동한다. 깃털은 무작위 8방향으로 꺾이며 최대 3칸 이동하고, 접촉한 아군의 공격력을 5초간 20% 감소시킨다. 8초마다 광휘의 탈피를 사용해 모든 디버프를 해제하고 5초간 상태이상과 표식에 면역이 되며 받는 피해가 50% 감소한다."
-            : isFinalBoss && boss.finalBossPhase === 4
-              ? "6초마다 공간참, 마력 연소, 제압 사격, 얼음 산탄, 빙결 표식, 급강하·깃털 탄막, 광휘의 탈피 중 서로 다른 3개의 권능을 무작위로 동시에 사용한다. 얼음 산탄은 보호막 없이 현재 위치에서 즉시 발사한다. 진행 중인 급강하는 다시 선택하지 않으며, 예약된 착지 공격은 다른 권능과 함께 계속 진행된다."
-            : isStage05
-            ? "등장 8초 후 스켈레톤 5마리를 소환한다. 소환수가 존재하는 동안 무적이 되며, 15초 안에 처치하지 못하면 남은 스켈레톤의 체력을 흡수해 회복한다."
-            : isStage10
-              ? "이동을 멈추고 주변 3칸에 강력한 충격파를 일으킨다. 범위 안의 유닛은 3초 동안 기절해 공격할 수 없다."
-              : isStage15
-                ? "체력이 모두 소진되면 불타는 알로 변한다. 첫 알은 최대 체력의 30%, 두 번째 알부터는 첫 알 체력의 70%로 시작한다. 알은 받는 피해가 30% 감소하며, 15초 안에 파괴하지 못하면 최대 체력의 50%로 부활한다."
-                : isStage20
-                  ? "빛을 모아 현재 체력의 70%인 보호막을 전개한다. 보호막은 4구간으로 나뉘며, 15초마다 현재 수치의 다음 구간까지만 회복한다. 보호막은 피해를 50% 줄이고 이동속도를 80% 낮춘다. 파괴하면 5초간 기절하며 받는 피해가 2배가 되고, 파괴 시점부터 15초 후 새 보호막 충전을 시작한다."
-                  : isStage25
-                    ? "15초마다 이동을 멈추고 대지의 기운을 흡수한다. 붉게 예고된 5칸 중 빈 칸에는 자연벽을 세우고, 벽이 있는 칸은 종류와 관계없이 파괴해 이동 경로를 바꾼다. 파괴된 벽 위 유닛은 창고로 회수된다."
-                    : isStage30
-                      ? "부유석 4개가 피해 일부를 흡수한다. 모두 파괴하면 5초간 동력핵이 노출되어 받는 피해가 50% 증가한다. 부유석이 남아 있으면 무작위 경로로 자력 도약해 주변 2칸의 유닛을 3초간 기절시킨다."
-            : "고유 스킬 정보 준비 중"}</p>
         </div>
       </div>
     </section>

@@ -292,6 +292,14 @@ const getDebugPresetStage = (preset: DebugStagePreset) => {
   return 36;
 };
 
+const getFinalBossLightDamageMultiplier = (monster: Monster, specType: SpecType) =>
+  monster.isFinalBoss && monster.finalBossMode === "combat" && (
+    monster.finalBossPhase === 4 ||
+    (monster.finalBossPhase === 1 && specType === "balance") ||
+    (monster.finalBossPhase === 2 && specType === "land_spec") ||
+    (monster.finalBossPhase === 3 && specType === "air_spec")
+  ) ? 0.5 : 1;
+
 const getDebugPresetCategory = (preset: DebugStagePreset): MonsterCategory | "mixed" => {
   if (preset === "normal-land") return "land";
   if (preset === "normal-flying") return "flying";
@@ -651,6 +659,7 @@ export default function RogueTdPage() {
     setUnits([]);
     setMonsters([]);
     setProjectiles([]);
+    setTier3FirePillars([]);
     setStorageSlots(Array(20).fill(null));
     setSelectedStorageIndex(null);
     setActiveCellIndex(null);
@@ -667,6 +676,7 @@ export default function RogueTdPage() {
     monstersRef.current = [];
     projectilesRef.current = [];
     tier3FirePillarsRef.current = [];
+    pendingHeavenlyStrikesRef.current = [];
     unitsRef.current = [];
     setToSpawn(0);
     setRunning(false);
@@ -900,9 +910,11 @@ export default function RogueTdPage() {
     setToSpawn(0);
     setMonsters([]);
     setProjectiles([]);
+    setTier3FirePillars([]);
     monstersRef.current = [];
     projectilesRef.current = [];
     tier3FirePillarsRef.current = [];
+    pendingHeavenlyStrikesRef.current = [];
     const restedUnits = unitsRef.current.map((unit) => ({
       ...unit,
       cooldownMs: 0,
@@ -919,6 +931,32 @@ export default function RogueTdPage() {
       finalBossFrozenUntilMs: undefined,
       finalBossFeatherDebuffUntilMs: undefined,
       finalBossFeatherHitUntilMs: undefined,
+      activeSkillCooldownMs: undefined,
+      skillEffectUntilMs: undefined,
+      tier3RangerEffectUntilMs: undefined,
+      tier3RangerEffectKind: undefined,
+      tier3RangerEffectRow: undefined,
+      tier3RangerEffectCol: undefined,
+      tier3RangerEffectAngleDeg: undefined,
+      tier3AreaKind: undefined,
+      swordsmanWaveUntilMs: undefined,
+      swordsmanWaveOriginRow: undefined,
+      swordsmanWaveOriginCol: undefined,
+      swordsmanWaveDirectionRow: undefined,
+      swordsmanWaveDirectionCol: undefined,
+      swordsmanWaveLength: undefined,
+      adrenalinePhase: undefined,
+      adrenalinePhaseUntilMs: undefined,
+      frozenOrbCell: undefined,
+      frozenOrbPathPosition: undefined,
+      frozenOrbTrailCells: undefined,
+      frozenOrbUntilMs: undefined,
+      frozenOrbNextTickMs: undefined,
+      frozenOrbExplosionCell: undefined,
+      frozenOrbExplosionUntilMs: undefined,
+      heavenlyJudgmentNextAtMs: undefined,
+      swordsmanAttackCount: 0,
+      shotgunAttackCount: 0,
     }));
     unitsRef.current = restedUnits;
     setUnits(restedUnits);
@@ -1092,6 +1130,8 @@ export default function RogueTdPage() {
     setProjectiles([]);
     projectilesRef.current = [];
     tier3FirePillarsRef.current = [];
+    pendingHeavenlyStrikesRef.current = [];
+    setTier3FirePillars([]);
     setToSpawn(0);
     setGameResult("playing");
     setPaused(false);
@@ -1567,6 +1607,7 @@ export default function RogueTdPage() {
     clearInteraction();
     setMonsters([]);
     setProjectiles([]);
+    setTier3FirePillars([]);
     const restedUnits = units.map((unit) => ({
       ...unit,
       cooldownMs: 0,
@@ -3076,6 +3117,9 @@ export default function RogueTdPage() {
           (m.bossStage === 15 && (stage15State === "transforming" || stage15State === "hatching"))
         ) return 0;
         const sourceUnit = unitsRef.current.find((unit) => unit.id === sourceUnitId);
+        if (sourceUnit) {
+          damage *= getFinalBossLightDamageMultiplier(m, UNIT_TYPES[sourceUnit.typeId].specType);
+        }
         if (sourceUnit?.finalBossFeatherDebuffUntilMs && gameNow < sourceUnit.finalBossFeatherDebuffUntilMs) {
           damage *= 0.8;
         }
@@ -3280,17 +3324,11 @@ export default function RogueTdPage() {
         const primary = monstersRef.current.find((monster) => monster.id === strike.targetId && monster.hp > 0);
         if (!primary) return false;
         const getStrikeDamage = (monster: Monster, ratio: number) => {
-          const lightPenalty = monster.isFinalBoss && monster.finalBossMode === "combat" && (
-            monster.finalBossPhase === 4 ||
-            (monster.finalBossPhase === 1 && strike.specType === "balance") ||
-            (monster.finalBossPhase === 2 && strike.specType === "land_spec") ||
-            (monster.finalBossPhase === 3 && strike.specType === "air_spec")
-          ) ? 0.5 : 1;
           const typeMultiplier = monster.isFinalBoss && monster.finalBossPhase === 4
             ? 1
             : DAMAGE_MULTIPLIERS[strike.specType][monster.category] *
               getSpecSynergyDamageMultiplier(strike.specType, monster.category, synergy);
-          return Math.max(1, Math.round(strike.baseDamage * ratio * lightPenalty * typeMultiplier));
+          return Math.max(1, Math.round(strike.baseDamage * ratio * typeMultiplier));
         };
         dealDamage(primary, getStrikeDamage(primary, 1.25), strike.sourceUnitId);
         primary.tier3MageEffectKind = "lightning";
@@ -3308,16 +3346,9 @@ export default function RogueTdPage() {
           [...monstersRef.current].forEach((monster) => {
             if (monster.hp <= 0) return;
             job.contributions.forEach((contribution) => {
-              const definition = UNIT_TYPES[contribution.typeId];
-              const losesLight = monster.isFinalBoss && monster.finalBossMode === "combat" && (
-                monster.finalBossPhase === 4 ||
-                (monster.finalBossPhase === 1 && definition.specType === "balance") ||
-                (monster.finalBossPhase === 2 && definition.specType === "land_spec") ||
-                (monster.finalBossPhase === 3 && definition.specType === "air_spec")
-              );
               dealDamage(
                 monster,
-                Math.max(1, Math.round(contribution.damage * (losesLight ? 0.5 : 1))),
+                contribution.damage,
                 contribution.unitId,
               );
             });
@@ -3777,12 +3808,6 @@ export default function RogueTdPage() {
         }
 
         // 상성 배율 계산
-        const finalBossLightPenalty = target.isFinalBoss && target.finalBossMode === "combat" && (
-          target.finalBossPhase === 4 ||
-          (target.finalBossPhase === 1 && uDef.specType === "balance") ||
-          (target.finalBossPhase === 2 && uDef.specType === "land_spec") ||
-          (target.finalBossPhase === 3 && uDef.specType === "air_spec")
-        ) ? 0.5 : 1;
         const multiplier = target.isFinalBoss && target.finalBossPhase === 4
           ? 1
           : DAMAGE_MULTIPLIERS[uDef.specType][target.category] *
@@ -3792,7 +3817,7 @@ export default function RogueTdPage() {
           getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
           getUnitUpgradeDamageMultiplier(unit.typeId, upgradeLevels)
         );
-        const penalizedBaseDmg = baseDmg * finalBossLightPenalty;
+        const penalizedBaseDmg = baseDmg;
         let calculatedDamage = Math.max(1, Math.round(penalizedBaseDmg * multiplier));
 
         if (!skillsSealed && unit.tier >= 3 && (unit.activeSkillCooldownMs ?? 1) <= 0) {
@@ -3996,16 +4021,13 @@ export default function RogueTdPage() {
             ratios[chainTargets.length - 1] = unit.tier >= 3 ? 3 : 2.5;
           }
           chainTargets.forEach((monster, index) => {
-            const losesLight = monster.isFinalBoss && monster.finalBossMode === "combat" && (
-              monster.finalBossPhase === 4 || monster.finalBossPhase === 3
-            );
             const chainMultiplier = monster.isFinalBoss && monster.finalBossPhase === 4
               ? 1
               : DAMAGE_MULTIPLIERS[uDef.specType][monster.category] *
                 getSpecSynergyDamageMultiplier(uDef.specType, monster.category, synergy);
             dealDamage(
               monster,
-              Math.max(1, Math.round(baseDmg * (losesLight ? 0.5 : 1) * chainMultiplier * ratios[index])),
+              Math.max(1, Math.round(baseDmg * chainMultiplier * ratios[index])),
               unit.id,
             );
             monster.chainHitUntilMs = gameNow + 450;

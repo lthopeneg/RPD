@@ -58,7 +58,11 @@ class RogueTdAudioEngine {
     if (this.context?.state === "suspended") void this.context.resume();
     const changed = this.mode !== mode;
     this.mode = mode;
-    if (changed) this.step = 0;
+    if (changed) {
+      this.step = 0;
+      if (this.timer !== null) window.clearInterval(this.timer);
+      this.timer = null;
+    }
     if (this.timer !== null) return;
     this.tickMusic();
     const interval = mode === "normal" ? 250 : mode === "boss" ? 205 : 185;

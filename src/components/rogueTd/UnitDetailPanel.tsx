@@ -76,7 +76,7 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
     if (unit.typeId === "ice_mage") return <>{percent(ICE_SLOW_CHANCE)}<i>{mageBonus > 0 ? ` (+${percent(mageBonus)})` : ""}</i> 확률로 주변 적을 1초간 50% 둔화</>;
     if (unit.typeId === "lightning_mage") return <>{percent(LIGHTNING_PARALYZE_CHANCE)}<i>{mageBonus > 0 ? ` (+${percent(mageBonus)})` : ""}</i> 확률로 대상을 1초간 마비</>;
     if (unit.typeId === "sniper") return <>{percent(SNIPER_EXECUTE_CHANCE)} 확률로 일반 적 즉사</>;
-    if (unit.typeId === "swordsman" || unit.typeId === "rifleman") return <>없음</>;
+    if (unit.typeId === "swordsman" || unit.typeId === "rifleman") return null;
     return <>{def.description}</>;
   })();
   const tierTwoSkill = unit.tier >= 2 ? getTierTwoSkill(unit.typeId, unit.tier) : null;
@@ -103,7 +103,7 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
           <div><dt>사거리</dt><dd>{format(def.rangeTiles + tierRangeBonus + rangeBonus)}칸 {rangeBonus > 0 && <b className="synergyStat">(+{format(rangeBonus)}칸)</b>}</dd></div>
           <div><dt>{specTarget} 피해</dt><dd>{specBonus > 0 ? <b className="synergyStat">+{percent(specBonus)}</b> : "없음"}</dd></div>
         </dl>
-        <div className="unitSpecialEffect"><strong>특수효과</strong><p>{specialEffect}</p></div>
+        {specialEffect && <div className="unitSpecialEffect"><strong>특수효과</strong><p>{specialEffect}</p></div>}
         {tierTwoSkill && (
           <div className="unitTierSkill">
             <strong>스킬</strong>

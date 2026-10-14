@@ -12,7 +12,7 @@ import type { UnitTypeId } from "../../games/rogueTd/types";
 import { UNIT_PORTRAIT_CLASSES, UNIT_SPRITE_CLASSES } from "../../games/rogueTd/unitSprites";
 import { UNIT_TIER2_SKILL_ICONS, UNIT_TIER3_SKILL_ICONS } from "../../games/rogueTd/unitSprites";
 import { getTierThreeSkill, getTierTwoSkill } from "../../games/rogueTd/unitSkillInfo";
-import { BOSS_SKILLS, FINAL_BOSS_SKILLS } from "../../games/rogueTd/bossSkillInfo";
+import { BOSS_SKILLS, FINAL_BOSS_LIGHT_DRAIN, FINAL_BOSS_SKILLS } from "../../games/rogueTd/bossSkillInfo";
 
 type CodexTab = "units" | "enemies" | "ultimates";
 type UnitTier = 1 | 2 | 3;
@@ -227,6 +227,7 @@ export default function CodexPanel({ onClose }: Props) {
                 <dl>
                   {"hp" in selectedEnemy && <div><dt>체력</dt><dd>{selectedEnemy.hp.toLocaleString()}</dd></div>}
                   <div><dt>이동속도</dt><dd>{selectedEnemy.speed.toFixed(2)}칸/초</dd></div>
+                  {selectedBossStage === 36 && <div><dt>빛 흡수</dt><dd className="codexLightDrainValue">{FINAL_BOSS_LIGHT_DRAIN[finalBossPhase]}</dd></div>}
                 </dl>
                 {displayedBossSkills.length > 0 && (
                   <div className="codexEnemySkills">
