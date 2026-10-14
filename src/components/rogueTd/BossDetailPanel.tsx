@@ -1,5 +1,6 @@
 import type { Monster, MonsterCategory } from "../../games/rogueTd/types";
 import { STAGE20_SHIELD_RATIO } from "../../games/rogueTd/constants";
+import { getBossSkills } from "../../games/rogueTd/bossSkillInfo";
 
 interface Props {
   boss: Monster;
@@ -51,7 +52,7 @@ const BOSS_NAMES: Record<number, string> = {
   20: "자색 성채의 기사 바르카인",
   25: "산맥거북 모르가론",
   30: "천공요새 아스트라온",
-  36: "FINAL BOSS",
+  36: "찬휘의 군주 아르카디온",
 };
 
 const formatSeconds = (milliseconds: number) =>
@@ -66,6 +67,7 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
   const isStage25 = stage === 25;
   const isStage30 = stage === 30;
   const isFinalBoss = boss.isFinalBoss || stage === 36;
+  const detailSkills = getBossSkills(stage, boss.finalBossPhase ?? 1);
   const stage15State = boss.stage15State ?? "phoenix";
   const stage20ShieldMaxHp = boss.stage20ShieldMaxHp ?? Math.max(
     1,
@@ -279,6 +281,14 @@ export default function BossDetailPanel({ boss, gameNowMs }: Props) {
         </dl>
 
         <div className="unitSpecialEffect bossSkillDescription">
+          <div className="bossSkillIconList" aria-label="보스 스킬 아이콘">
+            {detailSkills.map((skill) => (
+              <div className="bossSkillIconEntry" key={skill.name} title={skill.name}>
+                <img src={skill.icon} alt="" />
+                <span>{skill.name}</span>
+              </div>
+            ))}
+          </div>
           <strong>{isFinalBoss && boss.finalBossPhase === 1
             ? "스킬 · 찬탈한 무예"
             : isFinalBoss && boss.finalBossPhase === 2

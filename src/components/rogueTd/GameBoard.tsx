@@ -52,6 +52,7 @@ const CHAIN_LIGHTNING_EFFECT_IMAGE = new URL("../../images/chain-lightning-skill
 const FINAL_BOSS_FREEZE_PRISON_IMAGE = new URL("../../images/final-boss-freeze-prison.png", import.meta.url).href;
 const FINAL_BOSS_FREEZE_MARK_PROJECTILE_IMAGE = new URL("../../images/final-boss-freeze-mark-projectile.png", import.meta.url).href;
 const FINAL_BOSS_ICE_SHOTGUN_IMAGE = new URL("../../images/final-boss-ice-shotgun.png", import.meta.url).href;
+const CLEAR_FANFARE_LAUNCHER_IMAGE = new URL("../../images/clear-fanfare-launcher.png", import.meta.url).href;
 const TIER3_MAGE_VFX = {
   fire: new URL("../../images/tier3-mage-vfx-fire.png", import.meta.url).href,
   ice: new URL("../../images/tier3-mage-vfx-ice.png", import.meta.url).href,
@@ -147,6 +148,7 @@ interface Props {
   highlightedPlacementCells: boolean;
   renderCellMenu: (cellIndex: number) => ReactNode;
   ultimateOverlay?: ReactNode;
+  clearCelebrationToken?: number;
 }
 
 interface FinalBossBolt {
@@ -234,6 +236,49 @@ function FinalBossLightning({ paused, speed }: { paused: boolean; speed: 1 | 2 }
       aria-hidden="true"
     />
   ));
+}
+
+const CLEAR_FIREWORKS = Array.from({ length: 20 }, (_, index) => ({
+  x: 7 + ((index * 37 + 13) % 87),
+  y: 8 + ((index * 29 + 7) % 62),
+  size: 7 + ((index * 11) % 12),
+  delay: 140 + ((index * 173) % 1850),
+  color: ["#34d399", "#facc15", "#60a5fa", "#f472b6", "#fb7185", "#c084fc"][index % 6],
+}));
+const CLEAR_LAUNCH_RAYS = [0, 22.5, 45, 67.5, 90];
+
+function ClearCelebration() {
+  return (
+    <div className="clearCelebration" role="status" aria-live="assertive">
+      <div className="clearFireworkField" aria-hidden="true">
+        {(["left", "right"] as const).map((side) => (
+          <div key={side} className={`clearLauncher ${side}`}>
+            <img className="clearLauncherCone" src={CLEAR_FANFARE_LAUNCHER_IMAGE} alt="" />
+            {CLEAR_LAUNCH_RAYS.map((rotation, index) => (
+              <i key={rotation} style={{ "--ray-r": `${rotation}deg`, "--ray-delay": `${index * 75}ms` } as CSSProperties} />
+            ))}
+          </div>
+        ))}
+        {CLEAR_FIREWORKS.map((firework, index) => (
+          <i
+            key={`${firework.x}-${firework.y}-${index}`}
+            style={{
+              "--clear-x": `${firework.x}%`,
+              "--clear-y": `${firework.y}%`,
+              "--clear-size": `${firework.size}px`,
+              "--clear-delay": `${firework.delay}ms`,
+              "--clear-color": firework.color,
+            } as CSSProperties}
+          />
+        ))}
+      </div>
+      <strong aria-label="CLEAR">
+        {["C", "L", "E", "A", "R"].map((letter, index) => (
+          <span key={letter} aria-hidden="true" style={{ "--clear-letter": index } as CSSProperties}>{letter}</span>
+        ))}
+      </strong>
+    </div>
+  );
 }
 
 const MONSTER_SPRITE_CLASSES: Record<MonsterCategory, string> = {
@@ -342,6 +387,7 @@ export default function GameBoard(p: Props) {
         } as CSSProperties}
       >
         {p.ultimateOverlay}
+        {!!p.clearCelebrationToken && <ClearCelebration key={p.clearCelebrationToken} />}
         {p.bossWarning && (
           <div key={p.bossWarning.token} className="bossStageWarning" role="status" aria-live="assertive">
             <span className="bossWarningTriangle" aria-hidden="true"><i>!</i></span>

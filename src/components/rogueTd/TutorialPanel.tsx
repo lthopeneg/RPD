@@ -69,7 +69,7 @@ export default function TutorialPanel({ onClose }: Props) {
       <section className={`tutorialGuide ${placeBelow ? "below" : "above"}`} style={{ left: panelLeft, top: panelTop, width: panelWidth }}>
         <header>
           <span>STEP {step + 1} / {TUTORIAL_STEPS.length}</span>
-          <button type="button" onClick={onClose} aria-label="튜토리얼 닫기">×</button>
+          <button type="button" onClick={onClose} aria-label="도움말 닫기">×</button>
         </header>
         <h2 id="tutorial-step-title">{current.title}</h2>
         <p>{current.text}</p>

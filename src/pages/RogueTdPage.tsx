@@ -15,7 +15,9 @@ import DebugPanel from "../components/rogueTd/DebugPanel";
 import UltimateCutIn from "../components/rogueTd/UltimateCutIn";
 import TutorialPanel from "../components/rogueTd/TutorialPanel";
 import CodexPanel from "../components/rogueTd/CodexPanel";
+import AudioControls from "../components/rogueTd/AudioControls";
 import type { DebugBrush, DebugMonsterEntry, DebugStagePreset } from "../components/rogueTd/DebugPanel";
+import { rogueTdAudio } from "../games/rogueTd/audio";
 import { generateMap } from "../games/rogueTd/mapGenerator";
 import { findShortestPath, toRC } from "../games/rogueTd/pathfinding";
 import {
@@ -332,6 +334,11 @@ export default function RogueTdPage() {
   const [gameResult, setGameResult] = useState<"playing" | "won" | "lost">(
     "playing",
   );
+  const initialAudioSettings = useMemo(() => rogueTdAudio.getSettings(), []);
+  const [musicVolume, setMusicVolume] = useState(initialAudioSettings.musicVolume);
+  const [sfxVolume, setSfxVolume] = useState(initialAudioSettings.sfxVolume);
+  const [musicMuted, setMusicMuted] = useState(initialAudioSettings.musicMuted);
+  const [sfxMuted, setSfxMuted] = useState(initialAudioSettings.sfxMuted);
   const [units, setUnits] = useState<Unit[]>([]),
     [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
   const [monsters, setMonsters] = useState<Monster[]>([]);
@@ -381,6 +388,7 @@ export default function RogueTdPage() {
   const waveDamageRef = useRef<Record<number, number>>({});
   const waveUnitsRef = useRef<Unit[]>([]);
   const [ultimateSequence, setUltimateSequence] = useState<UltimateSequence | null>(null);
+  const [clearCelebrationToken, setClearCelebrationToken] = useState(0);
   const ultimateActiveRef = useRef(false);
   const ultimateQueueRef = useRef<UltimateJob[]>([]);
   const pendingUltimateHitsRef = useRef<UltimateJob[]>([]);
@@ -390,6 +398,41 @@ export default function RogueTdPage() {
     mage: Number.POSITIVE_INFINITY,
     ranger: Number.POSITIVE_INFINITY,
   });
+  const lastSoundProjectileId = useRef(0);
+  const lastFinalBossPhase = useRef(1);
+
+  useEffect(() => {
+    if (gameResult === "won") {
+      rogueTdAudio.stopMusic();
+      rogueTdAudio.playSfx("clear");
+      return;
+    }
+    if (gameResult === "lost") {
+      rogueTdAudio.stopMusic();
+      rogueTdAudio.playSfx("defeat");
+      return;
+    }
+    if (!running || paused) {
+      rogueTdAudio.pauseMusic();
+      return;
+    }
+    rogueTdAudio.startMusic(isFinalStage(wave) ? "final" : isBossWave(wave) ? "boss" : "normal");
+  }, [gameResult, paused, running, wave]);
+
+  useEffect(() => {
+    const freshProjectiles = projectiles.filter((projectile) => projectile.id > lastSoundProjectileId.current);
+    if (freshProjectiles.length > 0 && running && !paused) {
+      rogueTdAudio.playSfx(freshProjectiles.some((projectile) => projectile.effectType !== "normal") ? "skill" : "attack");
+    }
+    const newestId = projectiles.reduce((largest, projectile) => Math.max(largest, projectile.id), lastSoundProjectileId.current);
+    lastSoundProjectileId.current = newestId;
+  }, [paused, projectiles, running]);
+
+  useEffect(() => {
+    const phase = monsters.find((monster) => monster.isFinalBoss)?.finalBossPhase ?? 1;
+    if (phase > lastFinalBossPhase.current) rogueTdAudio.playSfx("boss-phase");
+    lastFinalBossPhase.current = phase;
+  }, [monsters]);
 
   const openTutorial = useCallback(() => {
     setTutorialAttention(false);
@@ -1511,6 +1554,7 @@ export default function RogueTdPage() {
 
   function startWave() {
     if (running || gameResult !== "playing") return;
+    void rogueTdAudio.unlock().then(() => rogueTdAudio.playSfx("wave-start"));
     setPaused(false);
     pausedRef.current = false;
     setGrid((g) =>
@@ -1620,6 +1664,23 @@ export default function RogueTdPage() {
   const nextTier3AreaId = useRef(1);
   const pendingHeavenlyStrikesRef = useRef<PendingHeavenlyStrike[]>([]);
   const nextHeavenlyStrikeId = useRef(1);
+
+  const clearCombatVisuals = useCallback(() => {
+    monstersRef.current = [];
+    projectilesRef.current = [];
+    tier3FirePillarsRef.current = [];
+    pendingHeavenlyStrikesRef.current = [];
+    setMonsters([]);
+    setProjectiles([]);
+    setTier3FirePillars([]);
+    setSelectedBossId(null);
+    setBossWarning(null);
+    boardShakeUntilMs.current = 0;
+    ultimateActiveRef.current = false;
+    ultimateQueueRef.current = [];
+    pendingUltimateHitsRef.current = [];
+    setUltimateSequence(null);
+  }, []);
 
   useEffect(() => {
     unitsRef.current = units;
@@ -4123,9 +4184,7 @@ export default function RogueTdPage() {
 
     if (life <= 0) {
       setRunning(false);
-      projectilesRef.current = [];
-    tier3FirePillarsRef.current = [];
-      setProjectiles([]);
+      clearCombatVisuals();
       setGameResult("lost");
       setStatus("💀 생명력 0 이하! 게임 오버");
       addLog("라이프가 0이 되어 게임이 종료되었습니다.");
@@ -4138,9 +4197,7 @@ export default function RogueTdPage() {
 
     if (allSpawned && (allCleared || timeExpired)) {
       setRunning(false);
-      projectilesRef.current = [];
-    tier3FirePillarsRef.current = [];
-      setProjectiles([]);
+      clearCombatVisuals();
       const restedUnits = unitsRef.current.map((unit) => ({
         ...unit,
         cooldownMs: 0,
@@ -4164,6 +4221,13 @@ export default function RogueTdPage() {
         tier3RangerEffectRow: undefined,
         tier3RangerEffectCol: undefined,
         tier3RangerEffectAngleDeg: undefined,
+        tier3AreaKind: undefined,
+        swordsmanWaveUntilMs: undefined,
+        swordsmanWaveOriginRow: undefined,
+        swordsmanWaveOriginCol: undefined,
+        swordsmanWaveDirectionRow: undefined,
+        swordsmanWaveDirectionCol: undefined,
+        swordsmanWaveLength: undefined,
         adrenalinePhase: undefined,
         adrenalinePhaseUntilMs: undefined,
         frozenOrbCell: undefined,
@@ -4222,6 +4286,7 @@ export default function RogueTdPage() {
 
       if (wave >= PROTOTYPE_WAVES) {
         setGameResult("won");
+        setClearCelebrationToken((token) => token + 1);
         setStatus("🎉 FINAL BOSS를 처치했습니다! 게임 클리어!");
         addLog("FINAL STAGE를 클리어해 게임을 완료했습니다.");
       } else {
@@ -4233,7 +4298,7 @@ export default function RogueTdPage() {
         if (isBossWave(nextWave)) triggerBossWarning(nextWave);
       }
     }
-  }, [monsters.length, toSpawn, running, life, wave, waveTimeRemainingSec]);
+  }, [monsters.length, toSpawn, running, life, wave, waveTimeRemainingSec, clearCombatVisuals]);
 
   const renderCellMenu = (cellIndex: number) => {
     const cell = grid[cellIndex];
@@ -4407,6 +4472,10 @@ export default function RogueTdPage() {
           onClearMonsters={handleDebugClearMonsters}
           onSetTimer={handleDebugSetTimer}
           onPreviewUltimate={handleDebugPreviewUltimate}
+          onPreviewClear={() => {
+            void rogueTdAudio.unlock().then(() => rogueTdAudio.playSfx("clear"));
+            setClearCelebrationToken((token) => token + 1);
+          }}
           onClose={() => { setDebugMode(false); setDebugBrush(null); }}
         />
       )}
@@ -4502,6 +4571,7 @@ export default function RogueTdPage() {
                 phase={ultimateSequence.phase}
               />
             ) : null}
+            clearCelebrationToken={clearCelebrationToken}
           />
 
           <UpgradeStrip upgrades={upgrades} />
@@ -4536,16 +4606,44 @@ export default function RogueTdPage() {
               onMouseEnter={() => setTutorialAttention(false)}
               onFocus={() => setTutorialAttention(false)}
               onClick={openTutorial}
-              aria-label="게임 튜토리얼 열기"
+              aria-label="게임 도움말 열기"
             >
-              <span aria-hidden="true">?</span>
-              <strong>튜토리얼</strong>
-              <small>처음이라면 여기를 확인하세요</small>
+              <span aria-hidden="true">❔</span>
+              <strong>도움말</strong>
             </button>
             <button type="button" className="codexLauncher" onClick={openCodex} aria-label="게임 도감 열기">
-              <span aria-hidden="true">📖</span><strong>도감</strong><small>유닛과 적 정보</small>
+              <span aria-hidden="true">📖</span><strong>도감</strong>
             </button>
           </div>
+          <AudioControls
+            musicVolume={musicVolume}
+            sfxVolume={sfxVolume}
+            musicMuted={musicMuted}
+            sfxMuted={sfxMuted}
+            onMusicVolume={(value) => {
+              void rogueTdAudio.unlock();
+              setMusicVolume(value);
+              rogueTdAudio.setSettings({ musicVolume: value });
+            }}
+            onSfxVolume={(value) => {
+              void rogueTdAudio.unlock();
+              setSfxVolume(value);
+              rogueTdAudio.setSettings({ sfxVolume: value });
+            }}
+            onToggleMusic={() => {
+              void rogueTdAudio.unlock();
+              const next = !musicMuted;
+              setMusicMuted(next);
+              rogueTdAudio.setSettings({ musicMuted: next });
+            }}
+            onToggleSfx={() => {
+              void rogueTdAudio.unlock();
+              const next = !sfxMuted;
+              setSfxMuted(next);
+              rogueTdAudio.setSettings({ sfxMuted: next });
+              if (!next) rogueTdAudio.playSfx("wave-start");
+            }}
+          />
           <section className="playerResourcePanel panelBox">
             <div className="playerLevelRow">
               <strong>LV. {playerLevel}</strong>

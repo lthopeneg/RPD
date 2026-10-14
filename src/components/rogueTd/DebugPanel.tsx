@@ -28,6 +28,7 @@ interface Props {
   onClearMonsters: () => void;
   onSetTimer: (seconds: number) => void;
   onPreviewUltimate: (unitClass: UnitClass) => void;
+  onPreviewClear: () => void;
   onClose: () => void;
 }
 
@@ -184,6 +185,10 @@ export default function DebugPanel(props: Props) {
           </select>
           <button type="button" onClick={() => props.onPreviewUltimate(ultimateClass)}>연출 실행</button>
         </div>
+      </section>
+      <section>
+        <span className="debugHint">게임 클리어 연출 확인</span>
+        <button type="button" className="debugWide" onClick={props.onPreviewClear}>클리어 연출 실행</button>
       </section>
     </aside>
   );
