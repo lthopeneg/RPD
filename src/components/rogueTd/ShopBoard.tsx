@@ -2,7 +2,6 @@ import {
   MAX_PLAYER_LEVEL,
   SHOP_DRAW_COST,
   UNIT_TYPES,
-  UPGRADE_DAMAGE_PER_LEVEL,
   UPGRADE_DRAW_COST,
   XP_PER_PURCHASE,
   XP_PURCHASE_COST,
@@ -76,7 +75,7 @@ export default function ShopBoard({
         </button>
       </div>
       <p className="shopHelp">
-        경험치 +{XP_PER_PURCHASE} · 업그레이드 +1당 피해량 +{UPGRADE_DAMAGE_PER_LEVEL * 100}%
+        경험치 +{XP_PER_PURCHASE} · 업그레이드는 유닛과 성급에 따라 공격력 증가
       </p>
       {storageFull && <p className="shopNotice">창고가 가득 찼습니다.</p>}
       {latestUpgrade && (

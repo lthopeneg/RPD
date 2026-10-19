@@ -48,7 +48,7 @@ import {
   getUnitDeployLimit,
   getUnitTierAttackSpeedBonus,
   getUnitTierDamageMultiplier,
-  getUnitUpgradeDamageMultiplier,
+  getUnitUpgradeDamageBonus,
   getUnitTierRangeBonus,
   getMonsterHp,
   getWaveMonsterCategory,
@@ -149,7 +149,6 @@ import {
   STAGE30_WEAK_DURATION_MS,
   UNIT_SELL_PRICES,
   UNIT_TYPES,
-  UPGRADE_DAMAGE_PER_LEVEL,
   UPGRADE_DRAW_COST,
   WAVE_CLEAR_GOLD,
   WAVE_TIMEOUT_GOLD,
@@ -747,7 +746,7 @@ export default function RogueTdPage() {
     const upgrade = rollDamageUpgrade();
     setGold((g) => g - UPGRADE_DRAW_COST);
     setUpgrades((current) => [...current, upgrade]);
-    setStatus(`✨ ${getUpgradeLabel(upgrade)} 획득! 피해량 +${upgrade.levels * UPGRADE_DAMAGE_PER_LEVEL * 100}%`);
+    setStatus(`✨ ${getUpgradeLabel(upgrade)} 획득! 유닛과 성급에 맞는 고정 공격력이 증가했습니다.`);
     addLog(`${getUpgradeLabel(upgrade)}을(를) 획득했습니다.`);
   };
 
@@ -1800,12 +1799,10 @@ export default function RogueTdPage() {
             return {
               unitId: deployedUnit.id,
               typeId: deployedUnit.typeId,
-              damage: Math.max(1, Math.round(
-                definition.damage * (
-                  getUnitTierDamageMultiplier(deployedUnit.tier, definition.unitClass) +
-                  getUnitUpgradeDamageMultiplier(deployedUnit.typeId, upgradeLevels)
-                ) * ULTIMATE_DAMAGE_MULTIPLIER[unitClass],
-              )),
+              damage: Math.max(1, Math.round((
+                definition.damage * getUnitTierDamageMultiplier(deployedUnit.tier, definition.unitClass) +
+                getUnitUpgradeDamageBonus(deployedUnit.typeId, deployedUnit.tier, upgradeLevels)
+              ) * ULTIMATE_DAMAGE_MULTIPLIER[unitClass])),
             };
           });
           enqueueUltimate({ unitClass, unitTypeIds: requiredTypes, contributions });
@@ -3582,10 +3579,9 @@ export default function RogueTdPage() {
               unit.frozenOrbExplosionUntilMs = gameNow + 760;
               const [orbRow, orbCol] = toRC(unit.frozenOrbCell);
               const upgradeLevels = getUpgradeLevels(upgrades, unit.typeId);
-              const orbBaseDamage = uDef.damage * (
-                getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
-                getUnitUpgradeDamageMultiplier(unit.typeId, upgradeLevels)
-              );
+              const orbBaseDamage =
+                uDef.damage * getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
+                getUnitUpgradeDamageBonus(unit.typeId, unit.tier, upgradeLevels);
               monstersRef.current.forEach((monster) => {
                 if (monster.hp <= 0) return;
                 const [monsterRow, monsterCol] = getMonsterPos(monster);
@@ -3616,10 +3612,9 @@ export default function RogueTdPage() {
           } else if (gameNow >= unit.frozenOrbNextTickMs) {
             const [orbRow, orbCol] = toRC(unit.frozenOrbCell);
             const upgradeLevels = getUpgradeLevels(upgrades, unit.typeId);
-            const orbBaseDamage = uDef.damage * (
-              getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
-              getUnitUpgradeDamageMultiplier(unit.typeId, upgradeLevels)
-            );
+            const orbBaseDamage =
+              uDef.damage * getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
+              getUnitUpgradeDamageBonus(unit.typeId, unit.tier, upgradeLevels);
             monstersRef.current.forEach((monster) => {
               if (monster.hp <= 0) return;
               const [monsterRow, monsterCol] = getMonsterPos(monster);
@@ -3682,10 +3677,9 @@ export default function RogueTdPage() {
                 .sort(() => Math.random() - 0.5)
                 .slice(0, 4);
               const upgradeLevels = getUpgradeLevels(upgrades, unit.typeId);
-              const heavenlyBaseDamage = uDef.damage * (
-                getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
-                getUnitUpgradeDamageMultiplier(unit.typeId, upgradeLevels)
-              );
+              const heavenlyBaseDamage =
+                uDef.damage * getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
+                getUnitUpgradeDamageBonus(unit.typeId, unit.tier, upgradeLevels);
               chosenTargets.forEach((primary) => {
                 primary.heavenlyWarningUntilMs = gameNow + 360;
                 pendingHeavenlyStrikesRef.current.push({
@@ -3813,10 +3807,9 @@ export default function RogueTdPage() {
           : DAMAGE_MULTIPLIERS[uDef.specType][target.category] *
             getSpecSynergyDamageMultiplier(uDef.specType, target.category, synergy);
         const upgradeLevels = getUpgradeLevels(upgrades, unit.typeId);
-        const baseDmg = uDef.damage * (
-          getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
-          getUnitUpgradeDamageMultiplier(unit.typeId, upgradeLevels)
-        );
+        const baseDmg =
+          uDef.damage * getUnitTierDamageMultiplier(unit.tier, uDef.unitClass) +
+          getUnitUpgradeDamageBonus(unit.typeId, unit.tier, upgradeLevels);
         const penalizedBaseDmg = baseDmg;
         let calculatedDamage = Math.max(1, Math.round(penalizedBaseDmg * multiplier));
 

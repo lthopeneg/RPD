@@ -6,7 +6,7 @@ import {
   UNIT_TYPES,
   getUnitTierAttackSpeedBonus,
   getUnitTierDamageMultiplier,
-  getUnitUpgradeDamageMultiplier,
+  getUnitUpgradeDamageBonus,
   getUnitTierRangeBonus,
 } from "../../games/rogueTd/constants";
 import {
@@ -51,7 +51,7 @@ export default function UnitDetailPanel({ unit, upgrades, synergy, emptyMessage 
   const portraitClass = UNIT_PORTRAIT_CLASSES[unit.typeId];
   const upgradeLevels = getUpgradeLevels(upgrades, unit.typeId);
   const baseDamage = def.damage * getUnitTierDamageMultiplier(unit.tier, def.unitClass);
-  const upgradeDamage = def.damage * getUnitUpgradeDamageMultiplier(unit.typeId, upgradeLevels);
+  const upgradeDamage = getUnitUpgradeDamageBonus(unit.typeId, unit.tier, upgradeLevels);
   const attackSpeedBonus = def.unitClass === "warrior"
     ? WARRIOR_ATTACK_SPEED_BONUS[synergy.classTiers.warrior]
     : 0;

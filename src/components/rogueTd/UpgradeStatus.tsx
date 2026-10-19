@@ -1,4 +1,4 @@
-import { UNIT_TYPES, UPGRADE_DAMAGE_PER_LEVEL } from "../../games/rogueTd/constants";
+import { UNIT_TYPES } from "../../games/rogueTd/constants";
 import { getUpgradeLabel, getUpgradeLevels } from "../../games/rogueTd/upgrades";
 import type { DamageUpgrade } from "../../games/rogueTd/upgrades";
 import type { UnitTypeId } from "../../games/rogueTd/types";
@@ -14,14 +14,14 @@ export default function UpgradeStatus({ upgrades }: Props) {
   return (
     <section className="upgradeStatus panelBox">
       <h2>현재 업그레이드</h2>
-      <p className="upgradeRule">+1업당 기본 피해량 +{UPGRADE_DAMAGE_PER_LEVEL * 100}%</p>
+      <p className="upgradeRule">유닛과 성급에 따라 업그레이드 공격력 증가</p>
       {latest && <p className="latestUpgrade">최근: {getUpgradeLabel(latest)}</p>}
       {current.length === 0 ? (
         <p className="upgradeEmpty">적용된 업그레이드 없음</p>
       ) : (
         <div className="upgradeStatusList">
           {current.map(({ typeId, levels }) => (
-            <span key={typeId}>{UNIT_TYPES[typeId].icon} {UNIT_TYPES[typeId].name} +{levels}</span>
+            <span key={typeId}>{UNIT_TYPES[typeId].icon} {UNIT_TYPES[typeId].name} {levels}업</span>
           ))}
         </div>
       )}

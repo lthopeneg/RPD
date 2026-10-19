@@ -6,7 +6,7 @@ import {
   getBossHp,
   MONSTER_STATS,
   UNIT_TYPES,
-  getUnitUpgradeDamageMultiplier,
+  getUnitUpgradeDamageBonus,
 } from "../../games/rogueTd/constants";
 import type { UnitTypeId } from "../../games/rogueTd/types";
 import { UNIT_PORTRAIT_CLASSES, UNIT_SPRITE_CLASSES } from "../../games/rogueTd/unitSprites";
@@ -108,7 +108,7 @@ export default function CodexPanel({ onClose }: Props) {
   const damage = unit.damage * getUnitTierDamageMultiplier(tier, unit.unitClass);
   const attacksPerSecond = 1000 / unit.attackIntervalMs * (1 + getUnitTierAttackSpeedBonus(tier, unit.unitClass));
   const range = unit.rangeTiles + getUnitTierRangeBonus(tier, unit.unitClass);
-  const oneUpgradeDamage = unit.damage * getUnitUpgradeDamageMultiplier(selectedUnitId, 1);
+  const oneUpgradeDamage = getUnitUpgradeDamageBonus(selectedUnitId, tier, 1);
   const tierTwoSkill = tier >= 2 ? getTierTwoSkill(selectedUnitId, tier) : null;
   const tierThreeSkill = tier >= 3 ? getTierThreeSkill(selectedUnitId) : null;
   const selectedEnemy = ENEMY_ENTRIES[selectedIndex] ?? ENEMY_ENTRIES[0];

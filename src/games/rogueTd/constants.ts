@@ -248,7 +248,7 @@ export const getWaveTimeLimit = (wave: number) =>
       ? BOSS_WAVE_TIME_LIMIT_SEC
       : WAVE_TIME_LIMIT_SEC;
 export const SHOP_DRAW_COST = 20;
-export const UPGRADE_DRAW_COST = 30;
+export const UPGRADE_DRAW_COST = 10;
 export const MONSTER_KILL_GOLD = 1;
 export const BOSS_KILL_GOLD = 10;
 export const WAVE_CLEAR_GOLD = 30;
@@ -258,9 +258,22 @@ export const getBossClearGold = (wave: number) =>
     ? 300
     : BOSS_CLEAR_GOLD + (Math.floor(wave / BOSS_WAVE_INTERVAL) - 1) * 20;
 export const WAVE_TIMEOUT_GOLD = 10;
-export const UPGRADE_DAMAGE_PER_LEVEL = 0.05; // +1업당 기본 피해량 5%
-export const getUnitUpgradeDamageMultiplier = (typeId: UnitTypeId, upgradeLevels: number) =>
-  upgradeLevels * UPGRADE_DAMAGE_PER_LEVEL * (typeId === "dual_swordsman" ? 2 : 1);
+export const UNIT_UPGRADE_DAMAGE_PER_LEVEL: Record<UnitTypeId, Record<1 | 2 | 3, number>> = {
+  swordsman: { 1: 1, 2: 2, 3: 3 },
+  dual_swordsman: { 1: 2, 2: 4, 3: 6 },
+  magic_swordsman: { 1: 1, 2: 2, 3: 3 },
+  fire_mage: { 1: 1, 2: 2, 3: 3 },
+  ice_mage: { 1: 1, 2: 2, 3: 3 },
+  lightning_mage: { 1: 1, 2: 2, 3: 3 },
+  rifleman: { 1: 2, 2: 3, 3: 5 },
+  shotgunner: { 1: 1, 2: 2, 3: 3 },
+  sniper: { 1: 3, 2: 5, 3: 8 },
+};
+export const getUnitUpgradeDamageBonus = (
+  typeId: UnitTypeId,
+  tier: number,
+  upgradeLevels: number,
+) => UNIT_UPGRADE_DAMAGE_PER_LEVEL[typeId][normalizeUnitTier(tier)] * upgradeLevels;
 
 // 타입 상성 배율표
 export const DAMAGE_MULTIPLIERS: Record<
