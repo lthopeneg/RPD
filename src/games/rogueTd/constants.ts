@@ -248,7 +248,7 @@ export const getWaveTimeLimit = (wave: number) =>
       ? BOSS_WAVE_TIME_LIMIT_SEC
       : WAVE_TIME_LIMIT_SEC;
 export const SHOP_DRAW_COST = 20;
-export const UPGRADE_DRAW_COST = 10;
+export const UPGRADE_DRAW_COST = 20;
 export const MONSTER_KILL_GOLD = 1.5;
 export const BOSS_KILL_GOLD = 10;
 export const WAVE_CLEAR_GOLD = 30;
