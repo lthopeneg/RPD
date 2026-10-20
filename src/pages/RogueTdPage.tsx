@@ -4667,7 +4667,7 @@ export default function RogueTdPage() {
             <div className="xpTrack"><span style={{ width: `${playerXpPercent}%` }} /></div>
             <div className="resourceRow">
               <span>❤️ LIFE <b>{life}/{START_LIFE}</b></span>
-              <span>💰 GOLD <b>{gold}</b></span>
+              <span>💰 GOLD <b>{Math.floor(gold)}</b></span>
             </div>
             <div className="capacityRow">
               <span>⚔️ 배치 <b>{units.length}/{unitDeployLimit}</b></span>
